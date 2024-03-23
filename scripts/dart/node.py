@@ -175,11 +175,12 @@ class DartGenerate:
 
         if ban_tags:
             ban_tags_ids = tokenizer([ban_tags]).input_ids
+            bad_words_ids = [[token_id] for token_id in ban_tags_ids[0]]
         else:
-            ban_tags_ids = None
+            bad_words_ids = None
 
         with torch.no_grad():
-            outputs = model.generate(inputs, generation_config=generation_config, negative_prompt_ids=negative_inputs, bad_words_ids=ban_tags_ids)
+            outputs = model.generate(inputs, generation_config=generation_config, negative_prompt_ids=negative_inputs, bad_words_ids=bad_words_ids)
 
         prompts = [tokenizer.decode(output, skip_special_tokens=True) for output in outputs]
 
