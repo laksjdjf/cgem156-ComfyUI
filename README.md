@@ -3,6 +3,8 @@ ComfyUIのカスタムノードをまとめました。🍌
 
 使い方はそれぞれのリンクにあります（多分）。
 
+一部機能は[ComfyUI-Custom-Scripts](https://github.com/pythongosssss/ComfyUI-Custom-Scripts)の`ShowText`ノードを利用することを前提にしています。
+
 # Features
 |機能のリンク|説明|引用|
 |---|-----|---|
