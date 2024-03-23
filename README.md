@@ -21,6 +21,7 @@ ComfyUIのカスタムノードをまとめました。
 |[lortnoc](https://github.com/laksjdjf/cgem156-ComfyUI/tree/main/scripts/lortnoc)|謎のControlNet。||
 |[scale_crafter](https://github.com/laksjdjf/cgem156-ComfyUI/tree/main/scripts/scale_crafter)|[ScaleCrafter]の実装（一部）。|https://github.com/YingqingHe/ScaleCrafter|
 |[aesthetic_shadow](https://github.com/laksjdjf/cgem156-ComfyUI/tree/main/scripts/aesthetic_shadow)|アニメスタイル画像の品質評価モデル？|https://huggingface.co/shadowlilac/aesthetic-shadow-v2|
+|[wd-tagger](https://github.com/laksjdjf/cgem156-ComfyUI/tree/main/scripts/wd-tagger)|WD-Taggerのv3|https://huggingface.co/SmilingWolf, https://github.com/neggles/wdv3-timm|
 
 # references
 ノードの作成方法として以下のリポジトリや記事を参考にしています。
