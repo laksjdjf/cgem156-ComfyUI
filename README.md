@@ -1,5 +1,5 @@
-# cgem156-ComfyUI
-ComfyUIのカスタムノードをまとめました。🍌
+# cgem156-ComfyUI🍌
+ComfyUIのカスタムノードをまとめました。
 
 使い方はそれぞれのリンクにあります（多分）。
 
