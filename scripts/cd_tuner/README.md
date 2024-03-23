@@ -1,4 +1,4 @@
-cd_tunerの一部だけ実装しました。
+[cd_tuner](https://github.com/hako-mikan/sd-webui-cd-tuner)の一部だけ実装しました。
 
 detail1やdetail2は大きくすると書き込みが増え、マイナスにすると減ります。
 
