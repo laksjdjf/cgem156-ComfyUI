@@ -2,7 +2,6 @@ import importlib
 
 NODE_CLASS_MAPPINGS = {}
 NODE_DISPLAY_NAME_MAPPINGS = {}
-あ
 SYMBOL = "🍌"
 NODE_SURFIX = f"|cgem156"
 ROOT_NAME = f"cgem156 {SYMBOL}/"
