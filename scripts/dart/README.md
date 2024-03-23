@@ -1,6 +1,6 @@
 [Dart](https://huggingface.co/p1atdev/dart-v1-sft)のComfyUIノードです。
 
-すでに[ComfyUI-Dart](https://github.com/nkchocoai/ComfyUI-Dart)が公開されていますが、個人的に作ったモデルが使いたくて作ったものです。
+すでに[ComfyUI-Dart](https://github.com/nkchocoai/ComfyUI-Dart)が公開されていますが、個人的に作ったモデルを使いたくて作ったものです。
 
 batch_conditionとの連携で複数プロンプトを同時生成もできます。
 
