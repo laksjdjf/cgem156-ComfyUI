@@ -1,4 +1,5 @@
-from transformers import AutoTokenizer, AutoModelForCausalLM, GenerationConfig
+from transformers import AutoTokenizer, AutoModelForCausalLM, GenerationConfig, LogitsProcessorList
+from transformers.generation.logits_process import UnbatchedClassifierFreeGuidanceLogitsProcessor
 import comfy
 import torch
 import re
@@ -170,8 +171,15 @@ class DartGenerate:
 
         if config["cfg_scale"] != 1.0:
             negative_inputs = tokenizer([negative], return_tensors="pt").input_ids.to(comfy.model_management.get_torch_device()).repeat(batch_size, 1)
+            loggits_processor = LogitsProcessorList([
+                UnbatchedClassifierFreeGuidanceLogitsProcessor(
+                    guidance_scale=config["cfg_scale"],
+                    model=model,
+                    unconditional_ids=negative_inputs,
+                )
+            ])
         else:
-            negative_inputs = None
+            loggits_processor = None
 
         if ban_tags:
             ban_tags_ids = tokenizer([ban_tags]).input_ids
@@ -180,7 +188,7 @@ class DartGenerate:
             bad_words_ids = None
 
         with torch.no_grad():
-            outputs = model.generate(inputs, generation_config=generation_config, negative_prompt_ids=negative_inputs, bad_words_ids=bad_words_ids)
+            outputs = model.generate(inputs, generation_config=generation_config, bad_words_ids=bad_words_ids, logits_processor=loggits_processor)
 
         prompts = [tokenizer.decode(output, skip_special_tokens=True) for output in outputs]
 
