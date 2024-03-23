@@ -18,7 +18,7 @@ ComfyUIのカスタムノードをまとめました。
 |[dart](https://github.com/laksjdjf/cgem156-ComfyUI/tree/main/scripts/dart)|Dartを使うためのノード。|https://huggingface.co/p1atdev/dart-v1-sft|
 |[lora_merger](https://github.com/laksjdjf/cgem156-ComfyUI/tree/main/scripts/lora_merger)|LoRAのマージノード。||
 |[multiple_lora_loader](https://github.com/laksjdjf/cgem156-ComfyUI/tree/main/scripts/multiple_lora_loader)|複数LoRAを同時に適用するためのノード。||
-|[lortnoc](https://github.com/laksjdjf/cgem156-ComfyUI/tree/main/scripts/lortnoc)|謎のControlNet。||
+|[lortnoc](https://github.com/laksjdjf/cgem156-ComfyUI/tree/main/scripts/lortnoc)|謎のControlNet。|https://note.com/gcem156/n/n82067cbdeda3|
 |[scale_crafter](https://github.com/laksjdjf/cgem156-ComfyUI/tree/main/scripts/scale_crafter)|[ScaleCrafter]の実装（一部）。|https://github.com/YingqingHe/ScaleCrafter|
 |[aesthetic_shadow](https://github.com/laksjdjf/cgem156-ComfyUI/tree/main/scripts/aesthetic_shadow)|アニメスタイル画像の品質評価モデル？|https://huggingface.co/shadowlilac/aesthetic-shadow-v2|
 |[wd-tagger](https://github.com/laksjdjf/cgem156-ComfyUI/tree/main/scripts/wd-tagger)|WD-Taggerのv3|https://huggingface.co/SmilingWolf, https://github.com/neggles/wdv3-timm|
