@@ -6,7 +6,7 @@ SYMBOL = "🍌"
 NODE_SURFIX = f"|cgem156"
 ROOT_NAME = f"cgem156 {SYMBOL}/"
 
-scripts = ["batch_condition", "dart", "lortnoc", "attention_couple", "cd_tuner", "lora_merger", "multiple_lora_loader", "custom_samplers", "custom_schedulers", "scale_crafter", "aesthetic_shadow"]
+scripts = ["batch_condition", "dart", "lortnoc", "attention_couple", "cd_tuner", "lora_merger", "multiple_lora_loader", "custom_samplers", "custom_schedulers", "scale_crafter", "aesthetic_shadow", "for_test"]
 
 try:
     import timm
