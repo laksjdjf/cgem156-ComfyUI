@@ -141,7 +141,6 @@ class GradCam:
 
         for i in range(len(features)):
             feature = features[i].unsqueeze(0)
-            print(feature.shape)
             outputs = tagger.forward_head(feature).sigmoid()
             
             output = outputs[0, torch.tensor(target_ids)].sum(dim=-1)
