@@ -108,6 +108,7 @@ class GradCam:
                 "features": ("WD-TAGGER-FEATURES",),
                 "target_tag": ("STRING",{"default": "", "multiline": True}),
                 "heat_map_alpha": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "intepolate": (["nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"], {"default": "bilinear"}),
             }
         }
     
@@ -116,7 +117,7 @@ class GradCam:
     CATEGORY = CATEGORY_NAME
 
     @torch.inference_mode(False)
-    def grad_cam(self, tagger, features, target_tag, heat_map_alpha):
+    def grad_cam(self, tagger, features, target_tag, heat_map_alpha, intepolate):
         
         image = features["image"]
         size = (image.shape[1], image.shape[2])
@@ -125,8 +126,22 @@ class GradCam:
         features = features["feature"].detach().clone().requires_grad_(True)
         
         gradients = []
+        if features.shape[1] == 1024: # convnext
+            feature_size = 14
+            channel_dim = 1
+            hw_dim = (2, 3)
+        elif features.shape[2] == 768: # vit
+            feature_size = 28
+            channel_dim = 2
+            hw_dim = 1
+        elif features.shape[3] == 1024: # swin
+            feature_size = 14
+            channel_dim = 3
+            hw_dim = (1, 2)
+
         for i in range(len(features)):
             feature = features[i].unsqueeze(0)
+            print(feature.shape)
             outputs = tagger.forward_head(feature).sigmoid()
             
             output = outputs[0, torch.tensor(target_ids)].sum(dim=-1)
@@ -136,18 +151,19 @@ class GradCam:
             features.grad = None
         gradients = torch.cat(gradients)
 
-        weight = torch.mean(gradients, dim=1, keepdim=True)
-        heat_map = torch.sum(weight * features, dim=2).relu().reshape(-1, 1, 28, 28)
+        weight = torch.mean(gradients, dim=hw_dim, keepdim=True)
+        heat_map = torch.sum(weight * features, dim=channel_dim).relu().reshape(-1, 1, feature_size, feature_size)
         heat_map = heat_map / heat_map.max()
 
         heat_map = heat_map.permute(0, 2, 3, 1)
         heat_map = heat_map.reshape(-1, 1).detach().float().cpu().numpy()
 
         c_map = plt.get_cmap("jet")
-        heat_map = c_map(heat_map).reshape(-1, 28, 28, 4)[:,:,:,:3]
+        heat_map = c_map(heat_map).reshape(-1, feature_size, feature_size, 4)[:,:,:,:3]
         heat_map = torch.from_numpy(heat_map)
         heat_map = heat_map.permute(0, 3, 1, 2)
-        heat_map = torch.nn.functional.interpolate(heat_map, size=size, mode="bilinear", align_corners=False)
+
+        heat_map = torch.nn.functional.interpolate(heat_map, size=size, mode=intepolate)
         heat_map = heat_map.permute(0, 2, 3, 1)
 
         return (image * (1 - heat_map_alpha) + heat_map * heat_map_alpha, )
