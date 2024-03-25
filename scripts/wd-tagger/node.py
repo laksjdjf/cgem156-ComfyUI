@@ -106,7 +106,7 @@ class GradCam:
             "required": { 
                 "tagger": ("WD_TAGGER",),
                 "features": ("WD-TAGGER-FEATURES",),
-                "target_tag": ("STRING",{"default": ""}),
+                "target_tag": ("STRING",{"default": "", "multiline": True}),
                 "heat_map_alpha": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 1.0, "step": 0.01}),
             }
         }
@@ -120,7 +120,7 @@ class GradCam:
         
         image = features["image"]
         size = (image.shape[1], image.shape[2])
-        target_id = features["tag_to_id"][target_tag.strip().replace(" ", "_")]
+        target_ids = [features["tag_to_id"][tag.strip().replace(" ", "_")] for tag in target_tag.strip().strip(",").split(",")]
 
         features = features["feature"].detach().clone().requires_grad_(True)
         
@@ -128,7 +128,9 @@ class GradCam:
         for i in range(len(features)):
             feature = features[i].unsqueeze(0)
             outputs = tagger.forward_head(feature).sigmoid()
-            output = outputs[:,target_id]
+            
+            output = outputs[0, torch.tensor(target_ids)].sum(dim=-1)
+
             gradients.append(torch.autograd.grad(output, feature, retain_graph=True)[0])
             tagger.zero_grad()
             features.grad = None
