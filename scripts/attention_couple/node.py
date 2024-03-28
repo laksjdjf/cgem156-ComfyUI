@@ -50,28 +50,32 @@ class AttentionCouple:
     def attention_couple_simple(self, model, base_mask, **kwargs): 
         
         new_model = model.clone()
-        dtype = model.model.diffusion_model.dtype
-        device = comfy.model_management.get_torch_device()
-
         num_conds = len(kwargs) // 2 + 1
 
         mask = [base_mask] + [kwargs[f"mask_{i}"] for i in range(1, num_conds)]
-        mask = torch.stack(mask, dim=0).to(device, dtype=dtype)
+        mask = torch.stack(mask, dim=0)
         assert mask.sum(dim=0).min() > 0, "There are areas that are zero in all masks."
-        mask = mask / mask.sum(dim=0, keepdim=True)
+        self.mask = mask / mask.sum(dim=0, keepdim=True)
 
-        conds = [kwargs[f"cond_{i}"][0][0].to(device, dtype=dtype) for i in range(1, num_conds)]
-        num_tokens = [cond.shape[1] for cond in conds]
+        self.conds = [kwargs[f"cond_{i}"][0][0] for i in range(1, num_conds)]
+        num_tokens = [cond.shape[1] for cond in self.conds]
 
         def attn2_patch(q, k, v, extra_options):
             assert k.mean() == v.mean(), "k and v must be the same."
+            device, dtype = q.device, q.dtype
+            
+            if self.conds[0].device != device:
+                self.conds = [cond.to(device, dtype=dtype) for cond in self.conds]
+            if self.mask.device != device:
+                self.mask = self.mask.to(device, dtype=dtype)
+
             cond_or_unconds = extra_options["cond_or_uncond"]
             num_chunks = len(cond_or_unconds)
             self.batch_size = q.shape[0] // num_chunks
             q_chunks = q.chunk(num_chunks, dim=0)
             k_chunks = k.chunk(num_chunks, dim=0)
             lcm_tokens = lcm_for_list(num_tokens + [k.shape[1]])
-            conds_tensor = torch.cat([cond.repeat(self.batch_size, lcm_tokens // num_tokens[i], 1) for i, cond in enumerate(conds)], dim=0)
+            conds_tensor = torch.cat([cond.repeat(self.batch_size, lcm_tokens // num_tokens[i], 1) for i, cond in enumerate(self.conds)], dim=0)
 
             qs, ks = [], []
             for i, cond_or_uncond in enumerate(cond_or_unconds):
@@ -89,8 +93,9 @@ class AttentionCouple:
             return qs, ks, ks
 
         def attn2_output_patch(out, extra_options):
+
             cond_or_unconds = extra_options["cond_or_uncond"]
-            mask_downsample = get_mask(mask, self.batch_size, out.shape[1], extra_options["original_shape"])
+            mask_downsample = get_mask(self.mask, self.batch_size, out.shape[1], extra_options["original_shape"])
             outputs = []
             pos = 0
             for cond_or_uncond in cond_or_unconds:
