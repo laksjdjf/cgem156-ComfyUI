@@ -16,10 +16,11 @@ scripts = [
     "multiple_lora_loader",
     "custom_samplers", 
     "custom_schedulers",
+    "custom_guiders",
     "scale_crafter", 
     "aesthetic_shadow",
     "for_test",
-    "lora_xy",
+    "lora_xy"
 ]
 
 try:
