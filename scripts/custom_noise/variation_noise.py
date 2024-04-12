@@ -27,7 +27,7 @@ class VariationNoise:
                 "base_seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
                 "similarity": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.001}),
-                "batch_index": ("INT", {"default": 1, "min": 0, "max": 4096}),
+                "batch_index": ("INT", {"default": 1, "min": 1, "max": 4096}),
             }
         }
 
