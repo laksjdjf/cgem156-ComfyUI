@@ -17,6 +17,7 @@ scripts = [
     "custom_samplers", 
     "custom_schedulers",
     "custom_guiders",
+    "custom_noise",
     "scale_crafter", 
     "aesthetic_shadow",
     "for_test",
