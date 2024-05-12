@@ -53,6 +53,34 @@ class DartPrompt:
         prompt += "<|input_end|>"
 
         return (prompt, )
+
+class DartPromptV2:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "rating": (["general", "sensitive", "questionable", "explicit", "sfw", "nsfw"], ),
+                "copyright": ("STRING", {"default": "original"}),
+                "character": ("STRING", {"default": ""}),
+                "general": ("STRING", {"multiline": True}),
+                "aspect_ratio": (["ultra_wide", "wide", "square", "tall", "ultra_tall"], {"default": "tall"}),
+                "length": (["very_short", "short", "medium", "long", "very_long"], {"default": "medium"}),
+                "identity": (["none", "lax", "strict"], {"default": "none"}),
+            }
+        }
+    RETURN_TYPES = ("STRING", )
+    FUNCTION = "load"
+
+    CATEGORY = CATEGORY_NAME
+
+    def load(self, rating, copyright, character, general, aspect_ratio, length, identity):
+        prompt = "<|bos|>"        
+        prompt += f"<copylight>{copyright}</copyright>"
+        prompt += f"<character>{character}</character>"
+        prompt += f"<|rating:{rating}|>" + f"<|aspect_ratio:{aspect_ratio}|>" + f"<|length:{length}|>" + f"<|identity:{identity}|>"
+        prompt += f"<general>{general}<|identity:{identity}|><|input_end|>"
+
+        return (prompt, )
     
 class DartConfig:
     @classmethod
@@ -168,7 +196,6 @@ class DartGenerate:
         generation_config = GenerationConfig.from_pretrained("p1atdev/dart-v1-sft", **config) # こんなんでいいの？
         model.to(comfy.model_management.get_torch_device(), dtype=torch.float16).eval()
         inputs = tokenizer([prompt], return_tensors="pt").input_ids.to(comfy.model_management.get_torch_device()).repeat(batch_size, 1)
-
         if config["cfg_scale"] != 1.0:
             negative_inputs = tokenizer([negative], return_tensors="pt").input_ids.to(comfy.model_management.get_torch_device()).repeat(batch_size, 1)
             loggits_processor = LogitsProcessorList([
@@ -190,10 +217,11 @@ class DartGenerate:
         with torch.no_grad():
             outputs = model.generate(inputs, generation_config=generation_config, bad_words_ids=bad_words_ids, logits_processor=loggits_processor)
 
-        prompts = [tokenizer.decode(output, skip_special_tokens=True) for output in outputs]
+        prompts = [", ".join([tag for tag in tokenizer.batch_decode(output, skip_special_tokens=True) if tag.strip() != ""]) for output in outputs]
 
-        # delete rating
-        prompts = [", ".join(prompt.split(", ")[1:]) for prompt in prompts]
+        if "rating:" in prompts[0]:
+            # delete rating
+            prompts = [", ".join(prompt.split(", ")[1:]) for prompt in prompts]
 
         strings = "" # for checking
         for i, prompt in enumerate(prompts):
