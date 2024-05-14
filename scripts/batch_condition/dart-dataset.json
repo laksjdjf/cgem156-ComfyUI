@@ -1,0 +1,1447 @@
+{
+  "last_node_id": 231,
+  "last_link_id": 433,
+  "nodes": [
+    {
+      "id": 126,
+      "type": "LoadDart|cgem156",
+      "pos": [
+        374,
+        334
+      ],
+      "size": {
+        "0": 315,
+        "1": 102
+      },
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "DART_TOKENIZER",
+          "type": "DART_TOKENIZER",
+          "links": [
+            199,
+            217
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "DART_MODEL",
+          "type": "DART_MODEL",
+          "links": [
+            200
+          ],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadDart|cgem156"
+      },
+      "widgets_values": [
+        "p1atdev/dart-v2-moe-sft",
+        "p1atdev/dart-v2-moe-sft"
+      ]
+    },
+    {
+      "id": 128,
+      "type": "DartConfig|cgem156",
+      "pos": [
+        383,
+        483
+      ],
+      "size": {
+        "0": 315,
+        "1": 202
+      },
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "DART_CONFIG",
+          "type": "DART_CONFIG",
+          "links": [
+            201
+          ],
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "DartConfig|cgem156"
+      },
+      "widgets_values": [
+        128,
+        0,
+        1,
+        1,
+        100,
+        1,
+        1
+      ]
+    },
+    {
+      "id": 226,
+      "type": "DartPromptV2|cgem156",
+      "pos": [
+        387,
+        742
+      ],
+      "size": {
+        "0": 307.4042053222656,
+        "1": 245.39193725585938
+      },
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            411
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "DartPromptV2|cgem156"
+      },
+      "widgets_values": [
+        "general",
+        "original",
+        "",
+        "1girl, solo, ",
+        "tall",
+        "medium",
+        "none"
+      ]
+    },
+    {
+      "id": 127,
+      "type": "DartGenerate|cgem156",
+      "pos": [
+        760,
+        338
+      ],
+      "size": {
+        "0": 315,
+        "1": 218
+      },
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "tokenizer",
+          "type": "DART_TOKENIZER",
+          "link": 199
+        },
+        {
+          "name": "model",
+          "type": "DART_MODEL",
+          "link": 200
+        },
+        {
+          "name": "config",
+          "type": "DART_CONFIG",
+          "link": 201,
+          "slot_index": 2
+        },
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "link": 411,
+          "widget": {
+            "name": "prompt"
+          },
+          "slot_index": 3
+        },
+        {
+          "name": "ban_tags",
+          "type": "STRING",
+          "link": 206,
+          "widget": {
+            "name": "ban_tags"
+          },
+          "slot_index": 4
+        },
+        {
+          "name": "negative",
+          "type": "STRING",
+          "link": null,
+          "widget": {
+            "name": "negative"
+          },
+          "slot_index": 5
+        },
+        {
+          "name": "batch_size",
+          "type": "INT",
+          "link": 220,
+          "widget": {
+            "name": "batch_size"
+          }
+        },
+        {
+          "name": "seed",
+          "type": "INT",
+          "link": 223,
+          "widget": {
+            "name": "seed"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "BATCH_STRING",
+          "type": "BATCH_STRING",
+          "links": [
+            362,
+            413
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            218
+          ],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "DartGenerate|cgem156"
+      },
+      "widgets_values": [
+        "",
+        4,
+        43469872492587,
+        "randomize",
+        "",
+        ""
+      ]
+    },
+    {
+      "id": 131,
+      "type": "BanTags|cgem156",
+      "pos": [
+        401,
+        1050
+      ],
+      "size": {
+        "0": 302.3057556152344,
+        "1": 182.28616333007812
+      },
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "tokenizer",
+          "type": "DART_TOKENIZER",
+          "link": 217
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": [
+            206
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "BanTags|cgem156"
+      },
+      "widgets_values": [
+        ".* background\nmonochrome\ncomic\ngreyscale\n.* text"
+      ]
+    },
+    {
+      "id": 10,
+      "type": "CLIPTextEncode",
+      "pos": [
+        1307,
+        517
+      ],
+      "size": {
+        "0": 248.6802215576172,
+        "1": 196.58900451660156
+      },
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 420
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            423
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPTextEncode"
+      },
+      "widgets_values": [
+        "nsfw, lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry, artist name\n"
+      ]
+    },
+    {
+      "id": 201,
+      "type": "SaveLatentBatch|cgem156",
+      "pos": [
+        2463.0396222343707,
+        504.94263547656254
+      ],
+      "size": {
+        "0": 315,
+        "1": 106
+      },
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "latents",
+          "type": "LATENT",
+          "link": 427
+        },
+        {
+          "name": "seed",
+          "type": "INT",
+          "link": 361,
+          "widget": {
+            "name": "seed"
+          }
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SaveLatentBatch|cgem156"
+      },
+      "widgets_values": [
+        "train/pixel",
+        "npz",
+        43469872492587,
+        "randomize"
+      ]
+    },
+    {
+      "id": 200,
+      "type": "SaveImageBatch|cgem156",
+      "pos": [
+        2465.0396222343707,
+        662.9426354765625
+      ],
+      "size": {
+        "0": 315,
+        "1": 106
+      },
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 426
+        },
+        {
+          "name": "seed",
+          "type": "INT",
+          "link": 360,
+          "widget": {
+            "name": "seed"
+          }
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SaveImageBatch|cgem156"
+      },
+      "widgets_values": [
+        "train/pixel",
+        "png",
+        43469872492587,
+        "randomize"
+      ]
+    },
+    {
+      "id": 135,
+      "type": "ShowText|pysssss",
+      "pos": [
+        753,
+        779
+      ],
+      "size": {
+        "0": 642.7894897460938,
+        "1": 439.8255920410156
+      },
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "text",
+          "type": "STRING",
+          "link": 218,
+          "widget": {
+            "name": "text"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "STRING",
+          "type": "STRING",
+          "links": null,
+          "shape": 6
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ShowText|pysssss"
+      },
+      "widgets_values": [
+        [
+          "<|bos|><rating>rating:general</rating><copylight>original</copyright><character></character><general><|short|>1girl,solo,<|input_end|>"
+        ],
+        "Prompt 1:\n1girl, solo, blonde hair, blue shirt, breasts, brown eyes, closed mouth, collarbone, cowboy shot, cropped legs, fingernails, grey pants, groin, light smile, long hair, looking at viewer, navel, pants, shirt, small breasts, thighs, tight clothes, tight pants, very long hair\n\nPrompt 2:\n1girl, solo, black jacket, boots, brooch, closed mouth, fire, frown, full body, hand up, jacket, jewelry, long sleeves, medium hair, open clothes, open jacket, pants, pink hair, parted bangs, purple eyes, purple footwear, purple theme, standing, uniform, white pants\n\nPrompt 3:\n1girl, solo, angry, armor, bare shoulders, blue armor, blue eyes, clenched hand, clenched teeth, closed mouth, crop top, embers, eyeshadow, forehead, gauntlets, looking at viewer, makeup, parted bangs, purple eyeshadow, short hair, shoulder armor, teeth, upper body, v-shaped eyebrows, white hair\n\nPrompt 4:\n1girl, solo, black choker, black dress, black gloves, blonde hair, breasts, chain necklace, choker, collarbone, crescent, crescent earrings, dress, earrings, gloves, green eyes, jewelry, lipstick, makeup, medium breasts, necklace, parted lips, pearl necklace, red lips, short hair, single bare shoulder, upper body\n\n"
+      ]
+    },
+    {
+      "id": 137,
+      "type": "PrimitiveNode",
+      "pos": [
+        27.949940180778338,
+        803.7180698242186
+      ],
+      "size": {
+        "0": 210,
+        "1": 82
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "INT",
+          "type": "INT",
+          "links": [
+            223,
+            359,
+            360,
+            361,
+            428
+          ],
+          "slot_index": 0,
+          "widget": {
+            "name": "seed"
+          }
+        }
+      ],
+      "title": "SEED",
+      "properties": {
+        "Run widget replace on values": false
+      },
+      "widgets_values": [
+        43469872492587,
+        "increment"
+      ]
+    },
+    {
+      "id": 230,
+      "type": "KSampler",
+      "pos": [
+        2018,
+        344
+      ],
+      "size": [
+        315,
+        446
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 425
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": 424
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "link": 423
+        },
+        {
+          "name": "latent_image",
+          "type": "LATENT",
+          "link": 431,
+          "slot_index": 3
+        },
+        {
+          "name": "seed",
+          "type": "INT",
+          "link": 428,
+          "widget": {
+            "name": "seed"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            427,
+            429
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "KSampler"
+      },
+      "widgets_values": [
+        43469872492587,
+        "randomize",
+        20,
+        8,
+        "euler",
+        "normal",
+        1
+      ]
+    },
+    {
+      "id": 136,
+      "type": "PrimitiveNode",
+      "pos": [
+        30.94994018077834,
+        664.7180698242186
+      ],
+      "size": {
+        "0": 210,
+        "1": 82
+      },
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "INT",
+          "type": "INT",
+          "links": [
+            220,
+            432
+          ],
+          "slot_index": 0,
+          "widget": {
+            "name": "batch_size"
+          }
+        }
+      ],
+      "title": "BATCH_SIZE",
+      "properties": {
+        "Run widget replace on values": false
+      },
+      "widgets_values": [
+        4,
+        "fixed"
+      ]
+    },
+    {
+      "id": 132,
+      "type": "CLIPTextEncodeBatch|cgem156",
+      "pos": [
+        1355,
+        354
+      ],
+      "size": {
+        "0": 229.20001220703125,
+        "1": 46
+      },
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 433
+        },
+        {
+          "name": "texts",
+          "type": "BATCH_STRING",
+          "link": 414
+        }
+      ],
+      "outputs": [
+        {
+          "name": "CONDITIONING",
+          "type": "CONDITIONING",
+          "links": [
+            424
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CLIPTextEncodeBatch|cgem156"
+      }
+    },
+    {
+      "id": 9,
+      "type": "CheckpointLoaderSimple",
+      "pos": [
+        -14.718003067016607,
+        340.07006469726565
+      ],
+      "size": {
+        "0": 315,
+        "1": 98
+      },
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            425
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": [
+            420,
+            433
+          ],
+          "shape": 3,
+          "slot_index": 1
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": [
+            430
+          ],
+          "shape": 3,
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CheckpointLoaderSimple"
+      },
+      "widgets_values": [
+        "animagine-xl-3.1.safetensors"
+      ]
+    },
+    {
+      "id": 228,
+      "type": "PrefixString|cgem156",
+      "pos": [
+        1094,
+        333
+      ],
+      "size": {
+        "0": 223.62451171875,
+        "1": 106.02201080322266
+      },
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "prompts",
+          "type": "BATCH_STRING",
+          "link": 413
+        }
+      ],
+      "outputs": [
+        {
+          "name": "BATCH_STRING",
+          "type": "BATCH_STRING",
+          "links": [
+            414
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PrefixString|cgem156"
+      },
+      "widgets_values": [
+        "pixel art, "
+      ]
+    },
+    {
+      "id": 18,
+      "type": "VAEDecode",
+      "pos": [
+        2117,
+        865
+      ],
+      "size": {
+        "0": 210,
+        "1": 46
+      },
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 429
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 430
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            119,
+            426
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "VAEDecode"
+      }
+    },
+    {
+      "id": 199,
+      "type": "SaveBatchString|cgem156",
+      "pos": [
+        2462.3613460624993,
+        342.0862738554688
+      ],
+      "size": {
+        "0": 315,
+        "1": 106
+      },
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "prompts",
+          "type": "BATCH_STRING",
+          "link": 362
+        },
+        {
+          "name": "seed",
+          "type": "INT",
+          "link": 359,
+          "widget": {
+            "name": "seed"
+          }
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SaveBatchString|cgem156"
+      },
+      "widgets_values": [
+        "train/pixel",
+        "caption",
+        43469872492587,
+        "randomize"
+      ]
+    },
+    {
+      "id": 231,
+      "type": "EmptyLatentImage",
+      "pos": [
+        1662,
+        677
+      ],
+      "size": [
+        305.00073486328074,
+        105.06683776855425
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "batch_size",
+          "type": "INT",
+          "link": 432,
+          "widget": {
+            "name": "batch_size"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "LATENT",
+          "type": "LATENT",
+          "links": [
+            431
+          ],
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "EmptyLatentImage"
+      },
+      "widgets_values": [
+        832,
+        1216,
+        4
+      ]
+    },
+    {
+      "id": 19,
+      "type": "PreviewImage",
+      "pos": [
+        1630,
+        1013
+      ],
+      "size": [
+        1078.474404633398,
+        391.783748320898
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 119
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      }
+    }
+  ],
+  "links": [
+    [
+      119,
+      18,
+      0,
+      19,
+      0,
+      "IMAGE"
+    ],
+    [
+      199,
+      126,
+      0,
+      127,
+      0,
+      "DART_TOKENIZER"
+    ],
+    [
+      200,
+      126,
+      1,
+      127,
+      1,
+      "DART_MODEL"
+    ],
+    [
+      201,
+      128,
+      0,
+      127,
+      2,
+      "DART_CONFIG"
+    ],
+    [
+      206,
+      131,
+      0,
+      127,
+      4,
+      "STRING"
+    ],
+    [
+      217,
+      126,
+      0,
+      131,
+      0,
+      "DART_TOKENIZER"
+    ],
+    [
+      218,
+      127,
+      1,
+      135,
+      0,
+      "STRING"
+    ],
+    [
+      220,
+      136,
+      0,
+      127,
+      6,
+      "INT"
+    ],
+    [
+      223,
+      137,
+      0,
+      127,
+      7,
+      "INT"
+    ],
+    [
+      359,
+      137,
+      0,
+      199,
+      1,
+      "INT"
+    ],
+    [
+      360,
+      137,
+      0,
+      200,
+      1,
+      "INT"
+    ],
+    [
+      361,
+      137,
+      0,
+      201,
+      1,
+      "INT"
+    ],
+    [
+      362,
+      127,
+      0,
+      199,
+      0,
+      "BATCH_STRING"
+    ],
+    [
+      411,
+      226,
+      0,
+      127,
+      3,
+      "STRING"
+    ],
+    [
+      413,
+      127,
+      0,
+      228,
+      0,
+      "BATCH_STRING"
+    ],
+    [
+      414,
+      228,
+      0,
+      132,
+      1,
+      "BATCH_STRING"
+    ],
+    [
+      420,
+      9,
+      1,
+      10,
+      0,
+      "CLIP"
+    ],
+    [
+      423,
+      10,
+      0,
+      230,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      424,
+      132,
+      0,
+      230,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      425,
+      9,
+      0,
+      230,
+      0,
+      "MODEL"
+    ],
+    [
+      426,
+      18,
+      0,
+      200,
+      0,
+      "IMAGE"
+    ],
+    [
+      427,
+      230,
+      0,
+      201,
+      0,
+      "LATENT"
+    ],
+    [
+      428,
+      137,
+      0,
+      230,
+      4,
+      "INT"
+    ],
+    [
+      429,
+      230,
+      0,
+      18,
+      0,
+      "LATENT"
+    ],
+    [
+      430,
+      9,
+      2,
+      18,
+      1,
+      "VAE"
+    ],
+    [
+      431,
+      231,
+      0,
+      230,
+      3,
+      "LATENT"
+    ],
+    [
+      432,
+      136,
+      0,
+      231,
+      0,
+      "INT"
+    ],
+    [
+      433,
+      9,
+      1,
+      132,
+      0,
+      "CLIP"
+    ]
+  ],
+  "groups": [
+    {
+      "title": "Generate",
+      "bounding": [
+        1636,
+        254,
+        758,
+        686
+      ],
+      "color": "#A88",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Model",
+      "bounding": [
+        -25,
+        266,
+        347,
+        278
+      ],
+      "color": "#88A",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Group",
+      "bounding": [
+        337,
+        254,
+        1249,
+        1008
+      ],
+      "color": "#a1309b",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Setting",
+      "bounding": [
+        -1,
+        590,
+        307,
+        350
+      ],
+      "color": "#8A8",
+      "font_size": 24,
+      "locked": false
+    },
+    {
+      "title": "Group",
+      "bounding": [
+        2449,
+        265,
+        340,
+        527
+      ],
+      "color": "#3f789e",
+      "font_size": 24,
+      "locked": false
+    }
+  ],
+  "config": {},
+  "extra": {
+    "groupNodes": {
+      "a": {
+        "nodes": [
+          {
+            "type": "RandomNoise",
+            "pos": [
+              6034.436733580758,
+              2338.3464767201563
+            ],
+            "size": {
+              "0": 315,
+              "1": 82
+            },
+            "flags": {},
+            "order": 18,
+            "mode": 0,
+            "outputs": [
+              {
+                "name": "NOISE",
+                "type": "NOISE",
+                "links": [],
+                "shape": 3
+              }
+            ],
+            "properties": {
+              "Node name for S&R": "RandomNoise"
+            },
+            "widgets_values": [
+              4545,
+              "increment"
+            ],
+            "index": 0
+          },
+          {
+            "type": "KSamplerSelect",
+            "pos": [
+              6034.436733580758,
+              2608.3464767201563
+            ],
+            "size": {
+              "0": 315,
+              "1": 58
+            },
+            "flags": {},
+            "order": 19,
+            "mode": 0,
+            "outputs": [
+              {
+                "name": "SAMPLER",
+                "type": "SAMPLER",
+                "links": [],
+                "shape": 3
+              }
+            ],
+            "properties": {
+              "Node name for S&R": "KSamplerSelect"
+            },
+            "widgets_values": [
+              "euler"
+            ],
+            "index": 1
+          },
+          {
+            "type": "Reroute",
+            "pos": [
+              5934.436733580758,
+              2318.3464767201563
+            ],
+            "size": [
+              75,
+              26
+            ],
+            "flags": {},
+            "order": 20,
+            "mode": 0,
+            "inputs": [
+              {
+                "name": "",
+                "type": "*",
+                "link": null
+              }
+            ],
+            "outputs": [
+              {
+                "name": "",
+                "type": "*",
+                "links": null
+              }
+            ],
+            "properties": {
+              "showOutputText": false,
+              "horizontal": false
+            },
+            "index": 2
+          },
+          {
+            "type": "CFGGuider",
+            "pos": [
+              6034.436733580758,
+              2468.3464767201563
+            ],
+            "size": {
+              "0": 315,
+              "1": 98
+            },
+            "flags": {},
+            "order": 29,
+            "mode": 0,
+            "inputs": [
+              {
+                "name": "model",
+                "type": "MODEL",
+                "link": null
+              },
+              {
+                "name": "positive",
+                "type": "CONDITIONING",
+                "link": null
+              },
+              {
+                "name": "negative",
+                "type": "CONDITIONING",
+                "link": null
+              }
+            ],
+            "outputs": [
+              {
+                "name": "GUIDER",
+                "type": "GUIDER",
+                "links": [],
+                "shape": 3
+              }
+            ],
+            "properties": {
+              "Node name for S&R": "CFGGuider"
+            },
+            "widgets_values": [
+              8
+            ],
+            "index": 3
+          },
+          {
+            "type": "BasicScheduler",
+            "pos": [
+              6034.436733580758,
+              2708.3464767201563
+            ],
+            "size": {
+              "0": 315,
+              "1": 106
+            },
+            "flags": {},
+            "order": 30,
+            "mode": 0,
+            "inputs": [
+              {
+                "name": "model",
+                "type": "MODEL",
+                "link": null,
+                "slot_index": 0
+              }
+            ],
+            "outputs": [
+              {
+                "name": "SIGMAS",
+                "type": "SIGMAS",
+                "links": [],
+                "shape": 3
+              }
+            ],
+            "properties": {
+              "Node name for S&R": "BasicScheduler"
+            },
+            "widgets_values": [
+              "normal",
+              20,
+              1
+            ],
+            "index": 4
+          },
+          {
+            "type": "SamplerCustomAdvanced",
+            "pos": [
+              6374.436733580758,
+              2348.3464767201563
+            ],
+            "size": {
+              "0": 355.20001220703125,
+              "1": 106
+            },
+            "flags": {},
+            "order": 36,
+            "mode": 0,
+            "inputs": [
+              {
+                "name": "noise",
+                "type": "NOISE",
+                "link": null,
+                "slot_index": 0
+              },
+              {
+                "name": "guider",
+                "type": "GUIDER",
+                "link": null,
+                "slot_index": 1
+              },
+              {
+                "name": "sampler",
+                "type": "SAMPLER",
+                "link": null,
+                "slot_index": 2
+              },
+              {
+                "name": "sigmas",
+                "type": "SIGMAS",
+                "link": null,
+                "slot_index": 3
+              },
+              {
+                "name": "latent_image",
+                "type": "LATENT",
+                "link": null,
+                "slot_index": 4
+              }
+            ],
+            "outputs": [
+              {
+                "name": "output",
+                "type": "LATENT",
+                "links": null,
+                "shape": 3
+              },
+              {
+                "name": "denoised_output",
+                "type": "LATENT",
+                "links": null,
+                "shape": 3
+              }
+            ],
+            "properties": {
+              "Node name for S&R": "SamplerCustomAdvanced"
+            },
+            "index": 5
+          }
+        ],
+        "links": [
+          [
+            2,
+            0,
+            3,
+            0,
+            222,
+            "*"
+          ],
+          [
+            2,
+            0,
+            4,
+            0,
+            222,
+            "*"
+          ],
+          [
+            0,
+            0,
+            5,
+            0,
+            218,
+            "NOISE"
+          ],
+          [
+            3,
+            0,
+            5,
+            1,
+            220,
+            "GUIDER"
+          ],
+          [
+            1,
+            0,
+            5,
+            2,
+            219,
+            "SAMPLER"
+          ],
+          [
+            4,
+            0,
+            5,
+            3,
+            221,
+            "SIGMAS"
+          ]
+        ],
+        "external": []
+      }
+    }
+  },
+  "version": 0.4
+}
