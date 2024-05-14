@@ -104,6 +104,7 @@ class SaveBatchString:
             "required": {
                 "prompts": ("BATCH_STRING", ),
                 "folder": ("STRING", {"default": ""}),
+                "extension": ("STRING", {"default": "txt"}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
             }
         }
@@ -113,10 +114,10 @@ class SaveBatchString:
     OUTPUT_NODE = True
     CATEGORY = CATEGORY_NAME
 
-    def save(self, prompts, folder, seed):
+    def save(self, prompts, folder, extension, seed):
         os.makedirs(os.path.join(CURRENT_DIR, folder), exist_ok=True)
         for i, prompt in enumerate(prompts):
-            path = os.path.join(CURRENT_DIR, folder, f"{seed:06}_{i:03}.txt")
+            path = os.path.join(CURRENT_DIR, folder, f"{seed:06}_{i:03}.{extension}")
             with open(path, "w") as f:
                 f.write(prompt)
         return {}
@@ -128,6 +129,7 @@ class SaveImageBatch:
             "required": {
                 "images": ("IMAGE", ),
                 "folder": ("STRING", {"default": ""}),
+                "extension": ("STRING", {"default": "png"}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
             }
         }
@@ -137,10 +139,10 @@ class SaveImageBatch:
     OUTPUT_NODE = True
     CATEGORY = CATEGORY_NAME
 
-    def save(self, images, folder, seed):
+    def save(self, images, folder, extension, seed):
         os.makedirs(os.path.join(CURRENT_DIR, folder), exist_ok=True)
         for i, image in enumerate(images):
-            path = os.path.join(CURRENT_DIR, folder, f"{seed:06}_{i:03}.png")
+            path = os.path.join(CURRENT_DIR, folder, f"{seed:06}_{i:03}.{extension}")
             Image.fromarray((image.float().cpu() * 255).numpy().astype('uint8')).save(path)
         return {}
     
@@ -151,6 +153,7 @@ class SaveLatentBatch:
             "required": {
                 "latents": ("LATENT", ),
                 "folder": ("STRING", {"default": ""}),
+                "extension": (["npy", "npz"], {"default": "npy"}),
                 "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
             }
         }
@@ -160,9 +163,19 @@ class SaveLatentBatch:
     OUTPUT_NODE = True
     CATEGORY = CATEGORY_NAME
 
-    def save(self, latents, folder, seed):
+    def save(self, latents, folder, extension, seed):
         os.makedirs(os.path.join(CURRENT_DIR, folder), exist_ok=True)
         for i, latent in enumerate(latents["samples"]):
-            path = os.path.join(CURRENT_DIR, folder, f"{seed:06}_{i:03}.npy")
-            np.save(path, latent.float().cpu().numpy())
+            path = os.path.join(CURRENT_DIR, folder, f"{seed:06}_{i:03}.{extension}")
+            if extension == "npy":
+                np.save(path, latent.float().cpu().numpy())
+            else:
+                original_size = (latent.shape[2] * 8, latent.shape[3] * 8)
+                crop_ltrb = (0, 0)
+                np.savez(
+                    path, 
+                    latents=latent.float().cpu().numpy(),
+                    original_size=np.array(original_size),
+                    crop_ltrb=np.array(crop_ltrb),
+                )
         return {}
