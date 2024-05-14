@@ -170,8 +170,8 @@ class SaveLatentBatch:
             if extension == "npy":
                 np.save(path, latent.float().cpu().numpy())
             else:
-                original_size = (latent.shape[2] * 8, latent.shape[3] * 8)
-                crop_ltrb = (0, 0)
+                original_size = (latent.shape[1] * 8, latent.shape[2] * 8)
+                crop_ltrb = (0, 0, 0, 0)
                 np.savez(
                     path, 
                     latents=latent.float().cpu().numpy(),
