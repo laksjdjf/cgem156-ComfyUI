@@ -58,8 +58,8 @@ def parse_weight_list(text):
     else:
         return [float(weight) for weight in text.split(",")]
 
-LBW17TO26 = [2, 5, 8, 11, 12, 13, 15, 16, 17]
-LBW12TO20 = [2, 3, 4, 5, 8, 18, 19, 20]
+LBW17TO26 = [1, 4, 7, 10, 11, 12, 14, 15, 16]
+LBW12TO20 = [1, 2, 3, 4, 7, 17, 18, 19]
 
 MID_ID = {26:13, 20:10}
 
@@ -133,8 +133,8 @@ class LoraLoaderWeightOnly:
             lora = comfy.utils.load_torch_file(lora_path, safe_load=True)
             if lbw != "":
                 weight_list = parse_weight_list(lbw)
-                print(f"{lora_name} block weight is :{weight_list}")
                 weight_list = expand_lbw(weight_list)
+                print(f"{lora_name} block weight is :{weight_list}")
                 length = len(weight_list)
 
                 strength_clip = strength_clip * weight_list[0]
