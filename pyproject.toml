@@ -1,0 +1,14 @@
+[project]
+name = "cgem156-comfyui"
+description = "The custom nodes of laksjdjf have been integrated into the node pack of cgem156🍌."
+version = "1.0.0"
+license = "LICENSE"
+
+[project.urls]
+Repository = "https://github.com/laksjdjf/cgem156-ComfyUI"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "cgem156-ComfyUI"
+Icon = ""
