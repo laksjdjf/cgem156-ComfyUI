@@ -88,7 +88,7 @@ class AttentionCouple:
                     ks.append(torch.cat([k_target, conds_tensor], dim=0))
 
             qs = torch.cat(qs, dim=0)
-            ks = torch.cat(ks, dim=0)
+            ks = torch.cat(ks, dim=0).to(k)
 
             return qs, ks, ks
 
