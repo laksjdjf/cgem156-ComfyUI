@@ -1,6 +1,7 @@
 import comfy
 import folder_paths
 from ... import ROOT_NAME
+from .flux_map import FLUX_MAP
 
 CATEGORY_NAME = ROOT_NAME + "multiple_lora_loader"
 
@@ -80,9 +81,14 @@ def create_class(num_loras):
 
             if lora is None:
                 lora = comfy.utils.load_torch_file(lora_path, safe_load=True)
-                self.loaded_lora[index] = (lora_path, lora)
+                new_lora = {}
+                for key, value in lora.items():
+                    new_lora[FLUX_MAP.get(key, key)] = value
+                del lora
 
-            model_lora, clip_lora = comfy.sd.load_lora_for_models(model, clip, lora, strength_model, strength_clip)
+                self.loaded_lora[index] = (lora_path, new_lora)
+
+            model_lora, clip_lora = comfy.sd.load_lora_for_models(model, clip, new_lora, strength_model, strength_clip)
             return (model_lora, clip_lora)
         
     return MultipleLoraLoader
