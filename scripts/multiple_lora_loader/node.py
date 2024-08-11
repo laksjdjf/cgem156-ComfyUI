@@ -87,6 +87,8 @@ def create_class(num_loras):
                 del lora
 
                 self.loaded_lora[index] = (lora_path, new_lora)
+            else:
+                new_lora = lora
 
             model_lora, clip_lora = comfy.sd.load_lora_for_models(model, clip, new_lora, strength_model, strength_clip)
             return (model_lora, clip_lora)
