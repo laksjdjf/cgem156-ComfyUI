@@ -1,5 +1,7 @@
 from .preprocess import preprocess
 import timm
+import numpy as np
+import cv2
 import pandas as pd
 import torch
 import matplotlib.pyplot as plt
@@ -12,6 +14,8 @@ MODEL_REPO_MAP = [
     "SmilingWolf/wd-vit-tagger-v3",
     "SmilingWolf/wd-swinv2-tagger-v3",
     "SmilingWolf/wd-convnext-tagger-v3",
+    "SmilingWolf/wd-vit-large-tagger-v3",
+    "SmilingWolf/wd-eva02-large-tagger-v3",
 ]
 
 class LoadTagger:
@@ -120,13 +124,23 @@ class GradCam:
     def grad_cam(self, tagger, features, target_tag, heat_map_alpha, intepolate):
         
         image = features["image"]
+        
         size = (image.shape[1], image.shape[2])
         target_ids = [features["tag_to_id"][tag.strip().replace(" ", "_")] for tag in target_tag.strip().strip(",").split(",")]
 
         features = features["feature"].detach().clone().requires_grad_(True)
         
         gradients = []
-        if features.shape[1] == 1024: # convnext
+        if features.shape[1] == 1025: # eva02-large
+            feature_size = 32
+            channel_dim = 2
+            hw_dim = 1
+            features = features[:,1:]
+        elif features.shape[1] == 1024 and len(features.shape) == 3: # vit-large
+            feature_size = 32
+            channel_dim = 2
+            hw_dim = 1
+        elif features.shape[1] == 1024: # convnext
             feature_size = 14
             channel_dim = 1
             hw_dim = (2, 3)
@@ -152,7 +166,7 @@ class GradCam:
 
         weight = torch.mean(gradients, dim=hw_dim, keepdim=True)
         heat_map = torch.sum(weight * features, dim=channel_dim).relu().reshape(-1, 1, feature_size, feature_size)
-        heat_map = heat_map / heat_map.max()
+        heat_map = heat_map / heat_map.max(dim=2, keepdim=True).values.max(dim=3, keepdim=True).values
 
         heat_map = heat_map.permute(0, 2, 3, 1)
         heat_map = heat_map.reshape(-1, 1).detach().float().cpu().numpy()
@@ -166,3 +180,100 @@ class GradCam:
         heat_map = heat_map.permute(0, 2, 3, 1)
 
         return (image * (1 - heat_map_alpha) + heat_map * heat_map_alpha, )
+
+class GradCamAuto:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": { 
+                "tagger": ("WD_TAGGER",),
+                "features": ("WD-TAGGER-FEATURES",),
+                "threshold": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "heat_map_alpha": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "intepolate": (["nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"], {"default": "bilinear"}),
+            }
+        }
+    
+    RETURN_TYPES = ("IMAGE", )
+    FUNCTION = "grad_cam"
+    CATEGORY = CATEGORY_NAME
+
+    @torch.inference_mode(False)
+    def grad_cam(self, tagger, features, threshold, heat_map_alpha, intepolate):
+        
+        image = features["image"].detach().clone()
+        if image.shape[0] > 1:
+            raise ValueError("Batch size must be 1")
+        
+        size = (image.shape[1], image.shape[2])
+        id_to_tag = {v:k for k,v in features["tag_to_id"].items()}
+        features = features["feature"].detach().clone().requires_grad_(True)
+        
+        gradients = []
+        if features.shape[1] == 1025: # eva02-large
+            feature_size = 32
+            channel_dim = 2
+            hw_dim = 1
+            features = features[:,1:]
+        elif features.shape[1] == 1024 and len(features.shape) == 3: # vit-large
+            feature_size = 32
+            channel_dim = 2
+            hw_dim = 1
+        elif features.shape[1] == 1024: # convnext
+            feature_size = 14
+            channel_dim = 1
+            hw_dim = (2, 3)
+        elif features.shape[2] == 768: # vit
+            feature_size = 28
+            channel_dim = 2
+            hw_dim = 1
+        elif features.shape[3] == 1024: # swin
+            feature_size = 14
+            channel_dim = 3
+            hw_dim = (1, 2)
+
+
+        outputs = tagger.forward_head(features).sigmoid()
+        target_ids = torch.where(outputs > threshold)[1].detach()
+        outputs_filtered = outputs[0, torch.tensor(target_ids)]
+
+        for output in outputs_filtered:
+            gradients.append(torch.autograd.grad(output, features, retain_graph=True)[0])
+        tagger.zero_grad()
+        features.grad = None
+        
+        gradients = torch.cat(gradients)
+
+        weight = torch.mean(gradients, dim=hw_dim, keepdim=True)
+        heat_map = torch.sum(weight * features, dim=channel_dim).relu().reshape(-1, 1, feature_size, feature_size)
+        heat_map = heat_map / heat_map.max(dim=2, keepdim=True).values.max(dim=3, keepdim=True).values
+
+        heat_map = heat_map.permute(0, 2, 3, 1)
+        heat_map = heat_map.reshape(-1, 1).detach().float().cpu().numpy()
+
+        c_map = plt.get_cmap("jet")
+        heat_map = c_map(heat_map).reshape(-1, feature_size, feature_size, 4)[:,:,:,:3]
+        heat_map = torch.from_numpy(heat_map)
+        heat_map = heat_map.permute(0, 3, 1, 2)
+
+        heat_map = torch.nn.functional.interpolate(heat_map, size=size, mode=intepolate)
+        heat_map = heat_map.permute(0, 2, 3, 1)
+
+        output_image = image * (1 - heat_map_alpha) + heat_map * heat_map_alpha
+        images = [np.ascontiguousarray((image * 255).numpy().astype(np.uint8)) for image in output_image]
+
+        for image, target_id in zip(images, target_ids):
+            target_tag = id_to_tag[target_id.item()]
+            score = outputs[0, target_id]
+            cv2.putText(image, f"{target_tag}:", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            cv2.putText(image, f"{score:.2f}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        
+        # sort by score
+        image_score = [(image, output.item()) for image, output in zip(images, outputs_filtered)]
+        image_score.sort(key=lambda x: x[1], reverse=True)
+        images = [image for image, _ in image_score]
+
+        output_image = torch.from_numpy(np.array(images))
+        output_image = output_image.float() / 255
+
+        return (output_image, )
