@@ -1,7 +1,7 @@
 import comfy
 from ... import ROOT_NAME
 
-CATEGORY_NAME = ROOT_NAME + "/custom_guiders"
+CATEGORY_NAME = ROOT_NAME + "custom_guiders"
 
 class LimitedIntervalCFG(comfy.samplers.CFGGuider):
     def set_range(self, sigma_low, sigma_high):

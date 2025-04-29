@@ -164,8 +164,8 @@ class DartGenerate:
             },
             "optional":{
                 "config": ("DART_CONFIG", ),
-                "negative": ("STRING", {"default": None}),
-                "ban_tags": ("STRING", {"default": None}),
+                "negative": ("STRING", {"default": ""}),
+                "ban_tags": ("STRING", {"default": ""}),
             }
         }
     RETURN_TYPES = ("BATCH_STRING", "STRING")

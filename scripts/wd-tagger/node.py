@@ -99,6 +99,7 @@ class PredictTag:
             "feature": feature,
             "image": ((preprocessed_image + 1) / 2).flip(1).permute(0, 2, 3, 1).float().cpu(),  # なにこれは・・・
             "tag_to_id": tag_to_id,
+            "prob": probs
         }
         
         return (prompts, string, features)
@@ -113,6 +114,7 @@ class GradCam:
                 "target_tag": ("STRING",{"default": "", "multiline": True}),
                 "heat_map_alpha": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "intepolate": (["nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"], {"default": "bilinear"}),
+                "negative": ("BOOLEAN", ),
             }
         }
     
@@ -121,7 +123,7 @@ class GradCam:
     CATEGORY = CATEGORY_NAME
 
     @torch.inference_mode(False)
-    def grad_cam(self, tagger, features, target_tag, heat_map_alpha, intepolate):
+    def grad_cam(self, tagger, features, target_tag, heat_map_alpha, intepolate, negative):
         
         image = features["image"]
         
@@ -165,6 +167,8 @@ class GradCam:
         gradients = torch.cat(gradients)
 
         weight = torch.mean(gradients, dim=hw_dim, keepdim=True)
+        if negative:
+            weight = -weight
         heat_map = torch.sum(weight * features, dim=channel_dim).relu().reshape(-1, 1, feature_size, feature_size)
         heat_map = heat_map / heat_map.max(dim=2, keepdim=True).values.max(dim=3, keepdim=True).values
 
@@ -275,5 +279,96 @@ class GradCamAuto:
 
         output_image = torch.from_numpy(np.array(images))
         output_image = output_image.float() / 255
-
         return (output_image, )
+
+class GradPair:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": { 
+                "tagger": ("WD_TAGGER",),
+                "features": ("WD-TAGGER-FEATURES",),
+                "heat_map_alpha": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 1.0, "step": 0.01}),
+                "intepolate": (["nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"], {"default": "bilinear"}),
+                "negative": ("BOOLEAN", ),
+            }
+        }
+    
+    RETURN_TYPES = ("IMAGE", "STRING")
+    FUNCTION = "grad_cam"
+    CATEGORY = CATEGORY_NAME
+
+    @torch.inference_mode(False)
+    def grad_cam(self, tagger, features, heat_map_alpha, intepolate, negative):
+    
+        prob_diff = (features["prob"][0] - features["prob"][1])
+        prob_diff_data = pd.DataFrame({"label": features["tag_to_id"].keys(), "prob_diff": prob_diff})
+        prob_diff_data = prob_diff_data.sort_values(by="prob_diff", ascending=False)
+
+        top_20 = prob_diff_data.head(20)
+        bottom_20 = prob_diff_data.tail(20).sort_values(by="prob_diff")
+
+        output_string = f"Top 20 difference:\n{top_20.to_string(index=False)}\n ... \n:\n{bottom_20.to_string(index=False)}"
+        
+        image = features["image"]
+        if image.shape[0] != 2:
+            raise ValueError("Batch size must be 2")
+        
+        size = (image.shape[1], image.shape[2])
+
+        features = features["feature"].detach().clone().requires_grad_(True)
+        
+        gradients = []
+        if features.shape[1] == 1025: # eva02-large
+            feature_size = 32
+            channel_dim = 2
+            hw_dim = 1
+            features = features[:,1:]
+        elif features.shape[1] == 1024 and len(features.shape) == 3: # vit-large
+            feature_size = 32
+            channel_dim = 2
+            hw_dim = 1
+        elif features.shape[1] == 1024: # convnext
+            feature_size = 14
+            channel_dim = 1
+            hw_dim = (2, 3)
+        elif features.shape[2] == 768: # vit
+            feature_size = 28
+            channel_dim = 2
+            hw_dim = 1
+        elif features.shape[3] == 1024: # swin
+            feature_size = 14
+            channel_dim = 3
+            hw_dim = (1, 2)
+
+        for i in range(2):
+            feature = features[i].unsqueeze(0)
+            output_1 = tagger.forward_head(feature, pre_logits=True)
+            with torch.no_grad():
+                output_2 = tagger.forward_head(features[1-i].unsqueeze(0), pre_logits=True)
+
+            sim = torch.nn.functional.cosine_similarity(output_1, output_2)
+            gradients.append(torch.autograd.grad(sim, feature, retain_graph=True)[0])
+            tagger.zero_grad()
+            features.grad = None
+
+        gradients = torch.cat(gradients)
+
+        weight = torch.mean(gradients, dim=hw_dim, keepdim=True)
+        if negative:
+            weight = -weight
+        heat_map = torch.sum(weight * features, dim=channel_dim).relu().reshape(-1, 1, feature_size, feature_size)
+        heat_map = heat_map / heat_map.max(dim=2, keepdim=True).values.max(dim=3, keepdim=True).values
+
+        heat_map = heat_map.permute(0, 2, 3, 1)
+        heat_map = heat_map.reshape(-1, 1).detach().float().cpu().numpy()
+
+        c_map = plt.get_cmap("jet")
+        heat_map = c_map(heat_map).reshape(-1, feature_size, feature_size, 4)[:,:,:,:3]
+        heat_map = torch.from_numpy(heat_map)
+        heat_map = heat_map.permute(0, 3, 1, 2)
+
+        heat_map = torch.nn.functional.interpolate(heat_map, size=size, mode=intepolate)
+        heat_map = heat_map.permute(0, 2, 3, 1)
+
+        return (image * (1 - heat_map_alpha) + heat_map * heat_map_alpha, output_string)

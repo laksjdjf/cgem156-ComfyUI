@@ -7,6 +7,35 @@ import torch
 from PIL import Image, ImageFont, ImageDraw
 import numpy as np
 import os
+import matplotlib.pyplot as plt
+from PIL import Image
+from io import BytesIO
+
+def generate_image_matrix(images, xy_list):
+    num_images = len(images)
+    cols = len(xy_list)  # 列数
+    rows = num_images // cols
+    
+    fig, axes = plt.subplots(rows, cols, figsize=(cols * 2, rows * 2))
+    axes = axes.flatten()  # 1次元配列化
+    
+    for i in range(len(axes)):
+        if i < num_images:
+            axes[i].imshow(images[i])
+            axes[i].set_title(xy_list[i], fontsize=8)
+            axes[i].axis("off")
+        else:
+            axes[i].axis("off")  # 余ったスペースを空白にする
+    
+    plt.tight_layout()
+    
+    # Figure をバイナリデータとして保存し、PIL画像に変換
+    buf = BytesIO()
+    plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0)
+    plt.close(fig)
+    buf.seek(0)
+    
+    return Image.open(buf) 
 
 CATEGORY_NAME = ROOT_NAME + "lora_xy"
 
@@ -127,6 +156,33 @@ class KSamplerAdvancedXY(KSamplerAdvanced):
 
         return ({"samples":torch.cat(outputs)},)
     
+class XYImage:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required":{"images": ("IMAGE", ), "xy_list": ("XY_LIST", )},
+        }
+    
+    FUNCTION = "xy_images"
+    CATEGORY_NAME = ROOT_NAME
+
+    def xy_images(self, images, xy_list):
+        pil_images = []
+        for (batch_number, image) in enumerate(images):
+            i = 255. * image.cpu().numpy()
+            img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
+            pil_images.append(img)
+        
+        imgs = generate_image_matrix(pil_images, xy_list)
+        img = np.array(imgs).astype(np.float32) / 255.
+        img = img * 2. - 1.
+        img = torch.from_numpy(img).permute(2, 0, 1).unsqueeze(0)
+
+        return {"images": img}
+
+        
+
+
 
 class PreviewXY(PreviewImage):
     @classmethod
@@ -136,7 +192,7 @@ class PreviewXY(PreviewImage):
             "hidden": {"prompt": "PROMPT", "extra_pnginfo": "EXTRA_PNGINFO"},
         }
     
-    CATEGORY_NAME = ROOT_NAME + "preview_xy"
+    CATEGORY_NAME = ROOT_NAME
     
     def save_images(self, images, xy_list, filename_prefix="ComfyUI", prompt=None, extra_pnginfo=None):
         filename_prefix += self.prefix_append

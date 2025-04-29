@@ -119,6 +119,44 @@ class LoraMerge:
         
         return {"lora":weight, "strength_model":1, "strength_clip":1}
     
+class LoraSVDRank:
+    def __init__(self):
+        self.loaded_lora = None
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "lora": ("LoRA",),
+                "threshold": ("FLOAT", {
+                    "default": 1.0,
+                    "min": 0,
+                    "max": 1,
+                    "step": 0.01,
+                }),
+                "device": (["cuda", "cpu"], ),
+            },
+        }
+    RETURN_TYPES = ("STRING", )
+    FUNCTION = "show"
+
+    CATEGORY = CATEGORY_NAME
+    
+    @torch.no_grad()
+    def show(self, lora, threshold, device):
+
+        keys = [key[: key.rfind(".lora_down")] for key in lora["lora"].keys() if ".lora_down" in key]
+        pber = comfy.utils.ProgressBar(len(keys))
+
+        content = ""
+        for key in keys:
+            up, down, alpha = calc_up_down_alpha(key, lora)
+            index = svd_show(up, down, threshold, device)
+            content += f"{key}: {index}\n"
+            pber.update(1)
+        
+        return (content, )
+    
 @torch.no_grad()
 def calc_up_down_alpha(key, lora, add=True):
     up_key = key + ".lora_up.weight"
@@ -194,3 +232,17 @@ def svd_merge(up_1, down_1, up_2, down_2, rank, threshold, device=None):
     down = Vh.to(org_device, dtype=org_dtype) * math.sqrt(rank)
 
     return up, down
+
+@torch.no_grad()
+def svd_show(up, down, threshold, device):
+    up = up.to(device)
+    down = down.to(device)
+    rank = up.shape[1]
+    weight = up.view(-1, rank) @ down.view(rank, -1)
+    weight = weight.to(dtype=torch.float32) # SVD only supports float32
+
+    U, S, Vh = torch.linalg.svd(weight)
+    if threshold < 1:
+        index = index_sv_fro(S, threshold)
+
+    return index
