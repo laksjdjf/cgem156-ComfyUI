@@ -21,7 +21,8 @@ scripts = [
     "scale_crafter", 
     "aesthetic_shadow",
     "for_test",
-    "lora_xy"
+    "lora_xy",
+    "reference",
 ]
 
 try:
