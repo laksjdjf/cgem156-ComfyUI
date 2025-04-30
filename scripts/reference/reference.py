@@ -3,16 +3,6 @@ from ... import ROOT_NAME
 
 CATEGORY_NAME = ROOT_NAME + "reference"
 
-def new_vec(mode, chunks, x, index):
-    xs = x.clone().chunk(chunks, dim=0)
-    ref_xs = torch.cat([xi[index].unsqueeze(0).expand(xi.shape[0], -1, -1).clone() for xi in xs], dim=0).clone()
-
-    if mode == "concat":
-        new_x = x.clone()
-        return torch.cat([new_x, ref_xs], dim=1)
-    else:
-        return ref_xs
-
 class ReferenceApply:
     @classmethod
     def INPUT_TYPES(s):
@@ -35,7 +25,7 @@ class ReferenceApply:
 
     CATEGORY = CATEGORY_NAME
 
-    def reference_only(self, model, index, mode, depth, start_step, end_step, apply_input, apply_middle, apply_output): 
+    def reference_only(self, model, index, mode, depth, start_step, end_step, apply_input, apply_middle, apply_output):
         model_reference = model.clone()
         start_sigma = model_reference.model.model_sampling.percent_to_sigma(start_step)
         end_sigma = model_reference.model.model_sampling.percent_to_sigma(end_step)
@@ -48,6 +38,7 @@ class ReferenceApply:
         def reference_apply(q, k, v, extra_options):
             block_name, block_id = extra_options["block"]
             chunks = len(extra_options["cond_or_uncond"])
+            batch_size = q.shape[0] // chunks
 
             if block_name == "input" and not apply_input:
                 return q, k, v
@@ -67,10 +58,14 @@ class ReferenceApply:
 
             sigma = extra_options["sigmas"][0].item()
 
-            if end_sigma <= sigma <= start_sigma and block_number <= self.depth:
-                k_out = new_vec(mode, chunks, k_out, index)
-                v_out = new_vec(mode, chunks, v_out, index)
 
+            if end_sigma <= sigma <= start_sigma and block_number <= self.depth:
+                k_ref = k_out[index::batch_size].repeat_interleave(batch_size, dim=0)
+                v_ref = v_out[index::batch_size].repeat_interleave(batch_size, dim=0)
+
+                k_out = torch.cat([k_out, k_ref], dim=1) if mode == "concat" else k_ref
+                v_out = torch.cat([v_out, v_ref], dim=1) if mode == "concat" else v_ref
+            
             return q_out, k_out, v_out
 
         model_reference.set_model_attn1_patch(reference_apply)
