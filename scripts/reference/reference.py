@@ -60,8 +60,8 @@ class ReferenceApply:
 
 
             if end_sigma <= sigma <= start_sigma and block_number <= self.depth:
-                k_ref = k_out[index::batch_size].repeat_interleave(batch_size, dim=0)
-                v_ref = v_out[index::batch_size].repeat_interleave(batch_size, dim=0)
+                k_ref = k_out[index::batch_size].repeat_interleave(batch_size, dim=0).clone()
+                v_ref = v_out[index::batch_size].repeat_interleave(batch_size, dim=0).clone()
 
                 k_out = torch.cat([k_out, k_ref], dim=1) if mode == "concat" else k_ref
                 v_out = torch.cat([v_out, v_ref], dim=1) if mode == "concat" else v_ref
