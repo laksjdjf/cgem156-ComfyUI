@@ -107,8 +107,7 @@ def iter_records_by_difficulty(level: Difficulty) -> Iterable[NodeMigrationRecor
 
 
 def count_by_difficulty() -> dict[Difficulty, int]:
-    return {
-        "A": sum(1 for _ in iter_records_by_difficulty("A")),
-        "B": sum(1 for _ in iter_records_by_difficulty("B")),
-        "C": sum(1 for _ in iter_records_by_difficulty("C")),
-    }
+    counts: dict[Difficulty, int] = {"A": 0, "B": 0, "C": 0}
+    for record in NODE_MIGRATION_RECORDS:
+        counts[record.difficulty] += 1
+    return counts

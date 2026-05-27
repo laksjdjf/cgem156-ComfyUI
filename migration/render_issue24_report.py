@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from issue24_v3_registry import (
     ACCEPTANCE_CHECKLIST,
     NODE_MIGRATION_RECORDS,
@@ -22,13 +24,24 @@ def _print_bullets(items: tuple[str, ...]) -> None:
         print(f"- {item}")
 
 
+def _resolve_registration_entrypoint() -> str:
+    for candidate_root in Path(__file__).resolve().parents:
+        candidate = candidate_root / "__init__.py"
+        if not candidate.exists():
+            continue
+        if "NODE_CLASS_MAPPINGS" in candidate.read_text(encoding="utf-8"):
+            return str(candidate)
+    return "not found"
+
+
 def main() -> None:
     counts = count_by_difficulty()
+    registration_entrypoint_label = _resolve_registration_entrypoint()
 
     _print_section("全体サマリー")
     print(f"- Node total: {len(NODE_MIGRATION_RECORDS)}")
     print(f"- Difficulty A/B/C: {counts['A']}/{counts['B']}/{counts['C']}")
-    print("- Registration entrypoint: /tmp/workspace/laksjdjf/cgem156-ComfyUI/__init__.py")
+    print(f"- Registration entrypoint: {registration_entrypoint_label}")
 
     _print_section("ノード一覧")
     print("| Node | File | Difficulty | V1 Components | Migration Notes |")
