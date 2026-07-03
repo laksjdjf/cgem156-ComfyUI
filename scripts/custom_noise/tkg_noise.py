@@ -2,7 +2,8 @@ import comfy
 from typing import NamedTuple
 import torch
 import torch.nn.functional as F
-from ... import ROOT_NAME
+from ... import ROOT_NAME, SYMBOL, NODE_SURFIX
+from comfy_api.v0_0_2 import io
 CATEGORY_NAME = ROOT_NAME + "custom_noise"
 
 def get_mean_shifted_latents(
@@ -137,47 +138,46 @@ class Noise_RandomNoise:
         )
         return noise
 
-class TKGRandomNoise:
+class TKGRandomNoise(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "noise_seed": ("INT", {
-                    "default": 0,
-                    "min": 0,
-                    "max": 0xffffffffffffffff,
-                    "control_after_generate": True,
-                }),
-                "color": (
-                    [c.name for c in COLOR_SETS],
-                    {
-                        "default": "green",
-                    },
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id=f"TKGRandomNoise{NODE_SURFIX}",
+            display_name=f"TKG Random Noise {SYMBOL}",
+            category=CATEGORY_NAME,
+            inputs=[
+                io.Int.Input(
+                    "noise_seed",
+                    default=0,
+                    min=0,
+                    max=0xffffffffffffffff,
+                    control_after_generate=True,
                 ),
-                "shift": (
-                    "FLOAT",
-                    {
-                        "default": 0.11,
-                        "min": 0.0,
-                        "max": 1.0,
-                        "step": 0.01,
-                    },
+                io.Combo.Input(
+                    "color",
+                    options=[c.name for c in COLOR_SETS],
+                    default="green",
                 ),
-                "grid_factor": (
-                    "INT",
-                    {
-                        "default": 8,
-                        "min": 1,
-                        "max": 16,
-                        "step": 1,
-                    },
+                io.Float.Input(
+                    "shift",
+                    default=0.11,
+                    min=0.0,
+                    max=1.0,
+                    step=0.01,
                 ),
-            }
-        }
-    
-    RETURN_TYPES = ("NOISE",)
-    FUNCTION = "get_noise"
-    CATEGORY = CATEGORY_NAME
+                io.Int.Input(
+                    "grid_factor",
+                    default=8,
+                    min=1,
+                    max=16,
+                    step=1,
+                ),
+            ],
+            outputs=[
+                io.Noise.Output(),
+            ],
+        )
 
-    def get_noise(self, noise_seed, color, shift, grid_factor):
-        return (Noise_RandomNoise(noise_seed, color, shift, grid_factor),)
+    @classmethod
+    def execute(cls, noise_seed, color, shift, grid_factor) -> io.NodeOutput:
+        return io.NodeOutput(Noise_RandomNoise(noise_seed, color, shift, grid_factor))
