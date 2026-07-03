@@ -1,6 +1,7 @@
 import torch
 from comfy.ldm.modules.attention import optimized_attention
-from ... import ROOT_NAME
+from ... import ROOT_NAME, SYMBOL, NODE_SURFIX
+from comfy_api.v0_0_2 import io
 
 def attention_pytorch(q, k, v, heads, temperature=1.0, mask=None):
     b, _, dim_head = q.shape
@@ -18,50 +19,53 @@ def attention_pytorch(q, k, v, heads, temperature=1.0, mask=None):
     )
     return out
 
-class AttentionScale:
+class AttentionScale(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "model": ("MODEL", ),
-                "temperature": ("FLOAT", {"default": 1.0, "min": -1000.0, "max": 1000.0, "step": 0.01}),
-                "start_step": ("FLOAT", {"default": 0, "min": 0, "max": 1, "step": 0.001}),
-                "end_step": ("FLOAT", {"default": 1, "min": 0, "max": 1, "step": 0.001}),
-                "attn1": ("BOOLEAN", {"default": True}),
-                "attn2": ("BOOLEAN", {"default": True}),
-            }
-        }
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id=f"AttentionScale{NODE_SURFIX}",
+            display_name=f"Attention Scale {SYMBOL}",
+            category=ROOT_NAME + "for_test",
+            inputs=[
+                io.Model.Input("model"),
+                io.Float.Input("temperature", default=1.0, min=-1000.0, max=1000.0, step=0.01),
+                io.Float.Input("start_step", default=0, min=0, max=1, step=0.001),
+                io.Float.Input("end_step", default=1, min=0, max=1, step=0.001),
+                io.Boolean.Input("attn1", default=True),
+                io.Boolean.Input("attn2", default=True),
+            ],
+            outputs=[
+                io.Model.Output(),
+            ],
+        )
 
-    RETURN_TYPES = ("MODEL", )
-    FUNCTION = "apply"
-    CATEGORY = ROOT_NAME + "for_test"
-
-    def apply(self, model, temperature, start_step, end_step, attn1, attn2):
+    @classmethod
+    def execute(cls, model, temperature, start_step, end_step, attn1, attn2) -> io.NodeOutput:
         new_model = model.clone()
 
-        self.temperature = temperature
-        self.start_sigma = new_model.model.model_sampling.percent_to_sigma(start_step)
-        self.end_sigma = new_model.model.model_sampling.percent_to_sigma(end_step)
+        temperature_ = temperature
+        start_sigma = new_model.model.model_sampling.percent_to_sigma(start_step)
+        end_sigma = new_model.model.model_sampling.percent_to_sigma(end_step)
 
         def attn_patch(q, k, v, extra_options):
             sigma = extra_options["sigmas"][0].item()
 
-            if self.end_sigma <= sigma <= self.start_sigma:
-                output = attention_pytorch(q, k, v, extra_options["n_heads"], temperature = self.temperature)
+            if end_sigma <= sigma <= start_sigma:
+                output = attention_pytorch(q, k, v, extra_options["n_heads"], temperature = temperature_)
             else:
                 output = attention_pytorch(q, k, v, extra_options["n_heads"], temperature = 1.0)
 
             return output
-        
+
         def dummy_attn_path(q, k, v, extra_options):
             return optimized_attention(q, k, v, extra_options["n_heads"])
 
-        self.sdxl = hasattr(new_model.model.diffusion_model, "label_emb")
+        sdxl = hasattr(new_model.model.diffusion_model, "label_emb")
 
         attn1_patch = attn_patch if attn1 else dummy_attn_path
         attn2_patch = attn_patch if attn2 else dummy_attn_path
 
-        if not self.sdxl:
+        if not sdxl:
             for id in [1,2,4,5,7,8]: # id of input_blocks that have cross attention
                 new_model.set_model_attn1_replace(attn1_patch, "input", id)
                 new_model.set_model_attn2_replace(attn2_patch, "input", id)
@@ -85,5 +89,4 @@ class AttentionScale:
                     new_model.set_model_attn1_replace(attn1_patch, "output", id, index)
                     new_model.set_model_attn2_replace(attn2_patch, "output", id, index)
 
-        return (new_model, )
-
+        return io.NodeOutput(new_model)

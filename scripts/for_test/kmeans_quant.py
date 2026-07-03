@@ -1,7 +1,8 @@
-from ... import ROOT_NAME
+from ... import ROOT_NAME, SYMBOL, NODE_SURFIX
 import torch
 import numpy as np
 import cv2
+from comfy_api.v0_0_2 import io
 
 # ref:https://qiita.com/fdsafdfadsa/items/4e8046998be9627ca85d
 def kmeans_quant(img, K, kmeans_pp):
@@ -22,22 +23,22 @@ class KMeansManhattan:
     def fit(self, X):
         # データセットのサイズ
         n_samples, n_features = X.shape
-        
+
         # クラスタ中心をデータポイントの中からランダムに初期化
         rng = np.random.default_rng()
         self.centroids = X[rng.choice(n_samples, self.n_clusters, replace=False)]
-        
+
         for i in range(self.max_iters):
             # 各データポイントを最も近いクラスタに割り当てる
             self.labels = self._assign_clusters(X)
-            
+
             # 新しいクラスタ中心を計算 (マンハッタン距離のためには中央値を使用)
             new_centroids = np.array([np.median(X[self.labels == j], axis=0) for j in range(self.n_clusters)])
-            
+
             # クラスタ中心の変化が許容範囲内であれば終了
             if np.all(np.abs(self.centroids - new_centroids).sum(axis=1) < self.tol):
                 break
-            
+
             self.centroids = new_centroids
 
     def _assign_clusters(self, X):
@@ -49,7 +50,7 @@ class KMeansManhattan:
     def predict(self, X):
         # 新しいデータに対してクラスタを予測
         return self._assign_clusters(X)
-    
+
 def kmeans(img, K, kmeans_pp, manhattan, seed):
     orogin_state = np.random.get_state()
     np.random.seed(seed)
@@ -60,36 +61,35 @@ def kmeans(img, K, kmeans_pp, manhattan, seed):
         retval =  kmeans.centroids[kmeans.predict(img)]
     else:
         retval = kmeans_quant(img, K, kmeans_pp)
-    
+
     np.random.set_state(orogin_state)
     return retval
 
-class KmeansQuantize:
-    def __init__(self):
-        pass
+class KmeansQuantize(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id=f"KmeansQuantize{NODE_SURFIX}",
+            display_name=f"Kmeans Quantize {SYMBOL}",
+            category=ROOT_NAME + "for_test",
+            inputs=[
+                io.Image.Input("image"),
+                io.Int.Input("colors", default=256, min=1, max=256, step=1),
+                io.Boolean.Input("individual"),
+                io.Boolean.Input("kmeans_pp"),
+                io.Boolean.Input("manhattan"),
+                io.Int.Input("seed", default=0, min=0, max=0xffffffffffffffff),
+            ],
+            outputs=[
+                io.Image.Output(),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "image": ("IMAGE",),
-                "colors": ("INT", {"default": 256, "min": 1, "max": 256, "step": 1}),
-                "individual": ("BOOLEAN", ),
-                "kmeans_pp": ("BOOLEAN", ),
-                "manhattan": ("BOOLEAN", ),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
-            },
-        }
-
-    RETURN_TYPES = ("IMAGE",)
-    FUNCTION = "quantize"
-
-    CATEGORY = ROOT_NAME + "for_test"
-
-    def quantize(self, image: torch.Tensor, colors: int, individual: bool, kmeans_pp:bool, manhattan: bool, seed: int):
+    def execute(cls, image: torch.Tensor, colors: int, individual: bool, kmeans_pp:bool, manhattan: bool, seed: int) -> io.NodeOutput:
         batch_size, height, width, channels = image.shape
         image = image.reshape(batch_size, height * width, channels).float().cpu().numpy()
-        
+
         if individual:
             result = np.zeros_like(image)
             for i in range(batch_size):
@@ -98,4 +98,4 @@ class KmeansQuantize:
             result = kmeans(image.reshape(-1, channels), colors, kmeans_pp, manhattan, seed).reshape(batch_size, height * width, channels)
 
         result = torch.from_numpy(result).float().reshape(batch_size, height, width, channels)
-        return (result,)
+        return io.NodeOutput(result)
