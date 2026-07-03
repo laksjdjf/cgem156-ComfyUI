@@ -15,11 +15,11 @@ def create_class(num_loras):
             required = {"model": ("MODEL", )}
 
             required["normalize"] = ("BOOLEAN", {"default": False})
-            required["normalize_sum"] = ("FLOAT", {"default": 1.0, "min": -50.0, "max": 50.0, "step": 0.01})
+            required["normalize_sum"] = ("FLOAT", {"default": 1.0, "min": -50.0, "max": 50.0, "step": 0.01, "round": 0.001})
 
             for i in range(num_loras):
                 required[f"lora_name_{i}"] = (["None"] + folder_paths.get_filename_list("loras"), )
-                required[f"strength_model_{i}"] = ("FLOAT", {"default": 1.0, "min": -20.0, "max": 20.0, "step": 0.01})
+                required[f"strength_model_{i}"] = ("FLOAT", {"default": 1.0, "min": -20.0, "max": 20.0, "step": 0.01, "round": 0.001})
                 required[f"apply_{i}"] = ("BOOLEAN", {"default": True})
 
             return {"required": required, "optional": {"clip_optional": ("CLIP", )}}
