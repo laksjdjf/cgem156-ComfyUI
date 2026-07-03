@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+*.ipynb
+scripts/batch_condition/train/
+scripts/batch_condition/test/
+scripts/reference/cache/
