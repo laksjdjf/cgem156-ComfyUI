@@ -1,54 +1,31 @@
 import torch
+from comfy_api.v0_0_2 import io
 from ... import ROOT_NAME
 
 CATEGORY_NAME = ROOT_NAME + "cd-tuner"
 
-class CDTuner:
+class CDTuner(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "model": ("MODEL", ),
-                "detail_1": ("FLOAT", {
-                    "default": 0,
-                    "min": -10,
-                    "max": 10,
-                    "step": 0.1
-                }),
-                "detail_2": ("FLOAT", {
-                    "default": 0,
-                    "min": -10,
-                    "max": 10,
-                    "step": 0.1
-                }),
-                "contrast_1": ("FLOAT", {
-                    "default": 0,
-                    "min": -20,
-                    "max": 20,
-                    "step": 0.1
-                }),
-                "start": ("INT", {
-                    "default": 0, 
-                    "min": 0,
-                    "max": 1000,
-                    "step": 1,
-                    "display": "number"
-                }),
-                "end": ("INT", {
-                    "default": 1000, 
-                    "min": 0,
-                    "max": 1000,
-                    "step": 1,
-                    "display": "number"
-                }),
-            },
-        }
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="CD_Tuner|cgem156",
+            display_name="CD Tuner 🍌",
+            category=CATEGORY_NAME,
+            inputs=[
+                io.Model.Input("model"),
+                io.Float.Input("detail_1", default=0, min=-10, max=10, step=0.1),
+                io.Float.Input("detail_2", default=0, min=-10, max=10, step=0.1),
+                io.Float.Input("contrast_1", default=0, min=-20, max=20, step=0.1),
+                io.Int.Input("start", default=0, min=0, max=1000, step=1, display_mode=io.NumberDisplay.number),
+                io.Int.Input("end", default=1000, min=0, max=1000, step=1, display_mode=io.NumberDisplay.number),
+            ],
+            outputs=[
+                io.Model.Output(),
+            ],
+        )
 
-    RETURN_TYPES = ("MODEL", )
-    FUNCTION = "apply"
-    CATEGORY = CATEGORY_NAME
-
-    def apply(self, model, detail_1, detail_2, contrast_1, start, end):
+    @classmethod
+    def execute(cls, model, detail_1, detail_2, contrast_1, start, end) -> io.NodeOutput:
         '''
         detail_1: 最初のConv層のweightを減らしbiasを増やすことで、detailを増やす・・？
         detail_2: 最後のConv層前のGroupNormの以下略
@@ -56,37 +33,35 @@ class CDTuner:
         '''
         new_model = model.clone()
         ratios = fineman([detail_1, detail_2, contrast_1])
-        self.storedweights = {}
-        self.start = start
-        self.end = end
+        storedweights = {}
 
         # unet計算前後のパッチ
         def apply_cdtuner(model_function, kwargs):
             t = new_model.model.model_sampling.timestep(kwargs["timestep"])
-            if t[0] < (1000 - self.end) or t[0] > (1000 - self.start):
+            if t[0] < (1000 - end) or t[0] > (1000 - start):
                 return model_function(kwargs["input"], kwargs["timestep"], **kwargs["c"])
             for i, name in enumerate(ADJUSTS):
                 # 元の重みをロード
-                self.storedweights[name] = getset_nested_module_tensor(True, new_model, name).clone()
+                storedweights[name] = getset_nested_module_tensor(True, new_model, name).clone()
                 if 4 > i:
-                    new_weight = self.storedweights[name] * ratios[i]
+                    new_weight = storedweights[name] * ratios[i]
                 else:
-                    device = self.storedweights[name].device
-                    dtype = self.storedweights[name].dtype
-                    new_weight = self.storedweights[name] + torch.tensor(ratios[i], device=device, dtype=dtype)
+                    device = storedweights[name].device
+                    dtype = storedweights[name].dtype
+                    new_weight = storedweights[name] + torch.tensor(ratios[i], device=device, dtype=dtype)
                 # 重みを書き換え
                 getset_nested_module_tensor(False, new_model, name, new_tensor=new_weight)
             retval = model_function(kwargs["input"], kwargs["timestep"], **kwargs["c"])
 
             # 重みを元に戻す
             for name in ADJUSTS:
-                getset_nested_module_tensor(False, new_model, name, new_tensor=self.storedweights[name])
+                getset_nested_module_tensor(False, new_model, name, new_tensor=storedweights[name])
 
             return retval
 
         new_model.set_model_unet_function_wrapper(apply_cdtuner)
 
-        return (new_model, )
+        return io.NodeOutput(new_model)
 
 
 def getset_nested_module_tensor(clone, model, tensor_path, new_tensor=None):
@@ -125,4 +100,3 @@ ADJUSTS = [
     "model.diffusion_model.out.0.bias",
     "model.diffusion_model.out.2.bias",
 ]
-
