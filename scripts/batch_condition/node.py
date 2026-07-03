@@ -179,3 +179,36 @@ class SaveLatentBatch:
                     crop_ltrb=np.array(crop_ltrb),
                 )
         return {}
+
+class RandomColorPrompt:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "base_prompt": ("STRING", {"default": "", "multiline": True}),
+                "num_prompts": ("INT", {"default": 4, "min": 1, "max": 100}),
+                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
+            }
+        }
+    RETURN_TYPES = ("BATCH_STRING", "STRING")
+    FUNCTION = "encode"
+    CATEGORY = CATEGORY_NAME
+
+    MAGIC_WORD = "<color>"
+    COLORS = [
+        "red", "blue", "green", "yellow", "purple", "orange", "pink", "brown", 
+        "black", "white", "gray", "aqua",
+    ]
+
+    def encode(self, base_prompt, num_prompts, seed):
+        rng = np.random.RandomState(seed)
+        prompts = []
+        for _ in range(num_prompts):
+            prompt = base_prompt
+            while self.MAGIC_WORD in prompt:
+                color = rng.choice(self.COLORS)
+                prompt = prompt.replace(self.MAGIC_WORD, color, 1)
+            prompts.append(prompt)
+        
+        return_string = "\n\n".join(prompts)
+        return (prompts, return_string)
