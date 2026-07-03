@@ -139,7 +139,7 @@ class LoraLoaderWeightOnly:
 
                 strength_clip = strength_clip * weight_list[0]
 
-                up_keys = [key for key in lora.keys() if "lora_up" in key and not "lora_te" in key]
+                up_keys = [key for key in lora.keys() if ("lora_up" in key or "lora_B" in key) and not "lora_te" in key]
 
                 for key in up_keys:
                     ids = extract_numbers(key)
@@ -166,9 +166,16 @@ class LoraLoaderWeightOnly:
                     if weight != 0.0:
                         lora[key] = lora[key] * weight
                     else:
+                        if "lora_up" in key:
+                            down_key = key.replace("lora_up", "lora_down")
+                            alpha_key = key.replace("lora_up.weight", "alpha")
+                        else:
+                            down_key = key.replace("lora_B", "lora_A")
+                            alpha_key = key.replace("lora_B.weight", "alpha")
                         del lora[key]
-                        del lora[key.replace("lora_up", "lora_down")]
-                        del lora[key.replace("lora_up.weight", "alpha")]
+                        del lora[down_key]
+                        if alpha_key in lora:
+                            del lora[alpha_key]
             
             self.loaded_lora = (lora_path, lora)
             self.lbw = lbw
