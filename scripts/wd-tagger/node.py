@@ -372,3 +372,48 @@ class GradPair:
         heat_map = heat_map.permute(0, 2, 3, 1)
 
         return (image * (1 - heat_map_alpha) + heat_map * heat_map_alpha, output_string)
+    
+class WDTaggerSimilarity:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": { 
+                "tagger": ("WD_TAGGER",),
+                "labels": ("WD_TAGGER_LABELS",),
+                "tag": ("STRING", {"multiline": True}),
+                "category": (["all", "general", "character"], ),
+                "ascending": ("BOOLEAN", {"default": False}),
+            }
+        }
+    
+    RETURN_TYPES = ("STRING",)
+    FUNCTION = "similarity"
+    CATEGORY = CATEGORY_NAME
+
+    def similarity(self, tagger, labels, tag, category, ascending):
+        dtype = tagger.parameters().__next__().dtype
+        tag_list = [t.strip().replace(" ", "_") for t in tag.strip().strip(",").split(",")]
+        tag_ids = [labels[labels["name"] == t].index[0] for t in tag_list if t in labels["name"].values]
+        if len(tag_ids) == 0:
+            return (f"No valid tags found in input: {tag}", )
+
+        with torch.no_grad():
+            tag_embeddings = tagger.get_classifier().weight[tag_ids].to("cpu", dtype=dtype)
+            all_embeddings = tagger.get_classifier().weight.to("cpu", dtype=dtype)
+
+            tag_embeddings = tag_embeddings / tag_embeddings.norm(dim=1, keepdim=True)
+            all_embeddings = all_embeddings / all_embeddings.norm(dim=1, keepdim=True)
+
+            similarity = torch.matmul(all_embeddings, tag_embeddings.T).min(dim=1).values.cpu().numpy()
+
+        labels["similarity"] = similarity
+        if category == "general":
+            labels = labels[labels["category"] == 0]
+        elif category == "character":
+            labels = labels[labels["category"] == 4]
+
+        labels = labels.sort_values(by="similarity", ascending=ascending)
+        output_string = f"Similarity result for tags: {', '.join(tag_list)}\n"
+        output_string += labels[["name", "similarity"]].head(50).to_string(index=False)
+        
+        return (output_string, )
