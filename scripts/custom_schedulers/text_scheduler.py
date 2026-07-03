@@ -5,27 +5,37 @@ connect to SamplerCustom
 '''
 
 import torch
+from comfy_api.v0_0_2 import io
 from ... import ROOT_NAME
 
 CATEGORY_NAME = ROOT_NAME + "custom_schedulers"
 
-class TextScheduler:
+class TextScheduler(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(s):
-        return {"required":{"model": ("MODEL",), "timesteps": ("STRING", {"multiline": True}), "verbose": ("BOOLEAN", )}}
-    RETURN_TYPES = ("SIGMAS",)
-    CATEGORY = CATEGORY_NAME
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="TextScheduler|cgem156",
+            display_name="Text Scheduler 🍌",
+            category=CATEGORY_NAME,
+            inputs=[
+                io.Model.Input("model"),
+                io.String.Input("timesteps", multiline=True),
+                io.Boolean.Input("verbose"),
+            ],
+            outputs=[
+                io.Sigmas.Output(),
+            ],
+        )
 
-    FUNCTION = "get_sigmas"
-
-    def get_sigmas(self, model, timesteps, verbose):
+    @classmethod
+    def execute(cls, model, timesteps, verbose) -> io.NodeOutput:
         timesteps = [float(timestep) for timestep in timesteps.replace(" ", "").split(",")]
         sigmas = model.model.model_sampling.sigma(torch.tensor(timesteps))
         sigmas = torch.cat([sigmas, torch.tensor([0])])
 
         if verbose:
             print("sigmas:", sigmas.tolist())
-        return (sigmas, )
+        return io.NodeOutput(sigmas)
 
 NODE_CLASS_MAPPINGS = {
     "TextScheduler": TextScheduler,
