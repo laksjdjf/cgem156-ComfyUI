@@ -12,8 +12,9 @@ import torch
 from comfy.k_diffusion.sampling import default_noise_sampler
 from tqdm.auto import trange
 import copy
+from comfy_api.v0_0_2 import io
 
-from ... import ROOT_NAME
+from ... import ROOT_NAME, SYMBOL, NODE_SURFIX
 
 @torch.no_grad()
 def sampler_lcm_rcfg(model, x, sigmas, extra_args=None, callback=None, disable=None, noise_sampler=None, enable=True, delta=1.0, cfg=1.0, original_latent=None, **kwargs):
@@ -55,30 +56,27 @@ def sampler_lcm_rcfg(model, x, sigmas, extra_args=None, callback=None, disable=N
             
     return x
 
-class LCMSamplerRCFG:
+class LCMSamplerRCFG(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required":{
-                "enable": ("BOOLEAN", {"default": True}),
-                "delta": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 5.0, "step":0.01, "round": False}),
-                "cfg": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 5.0, "step":0.01, "round": False}),
-            },
-            "optional":{
-                "original_latent": ("LATENT",),
-            }
-        }
-    RETURN_TYPES = ("SAMPLER",)
-    CATEGORY = ROOT_NAME + "custom_samplers"
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id=f"LCMSamplerRCFG{NODE_SURFIX}",
+            display_name=f"LCM Sampler RCFG {SYMBOL}",
+            category=ROOT_NAME + "custom_samplers",
+            inputs=[
+                io.Boolean.Input("enable", default=True),
+                io.Float.Input("delta", default=1.0, min=0.0, max=5.0, step=0.01, round=False),
+                io.Float.Input("cfg", default=1.0, min=0.0, max=5.0, step=0.01, round=False),
+                io.Latent.Input("original_latent", optional=True),
+            ],
+            outputs=[
+                io.Sampler.Output(),
+            ],
+        )
 
-    FUNCTION = "get_sampler"
-
-    def get_sampler(self, enable, delta, cfg, original_latent=None):
+    @classmethod
+    def execute(cls, enable, delta, cfg, original_latent=None) -> io.NodeOutput:
         original_latent = original_latent["samples"] if original_latent is not None else None
 
         sampler = KSAMPLER(sampler_lcm_rcfg, {"enable": enable, "delta":delta, "cfg":cfg, "original_latent":original_latent})
-        return (sampler, )
-    
-NODE_CLASS_MAPPINGS = {
-    "LCMSamplerRCFG": LCMSamplerRCFG,
-}
+        return io.NodeOutput(sampler)

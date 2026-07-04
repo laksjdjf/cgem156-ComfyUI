@@ -1,7 +1,8 @@
-from comfy.samplers import KSAMPLER 
+from comfy.samplers import KSAMPLER
 from comfy.k_diffusion.sampling import sample_euler_ancestral
 import torch
-from ... import ROOT_NAME
+from comfy_api.v0_0_2 import io
+from ... import ROOT_NAME, SYMBOL, NODE_SURFIX
 
 def fixed_noise_sampler(x, seed=None):
     if seed is not None:
@@ -20,21 +21,24 @@ def sample_euler_ancestral_fixed_noise(model, x, sigmas, extra_args=None, callba
     noise_sampler = fixed_noise_sampler(x, seed=seed) if noise_sampler is None else noise_sampler
     return sample_euler_ancestral(model, x, sigmas, extra_args=extra_args, callback=callback, disable=disable, eta=eta, s_noise=s_noise, noise_sampler=noise_sampler)
 
-class SamplerEulerAncestralFixedNoise:
+class SamplerEulerAncestralFixedNoise(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required":{
-                "noise": (["fixed", "random"], {"default": "fixed"}),
-                "eta": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 100.0, "step":0.01, "round": False}),
-                "s_noise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 100.0, "step":0.01, "round": False}),
-            },
-        }
-    RETURN_TYPES = ("SAMPLER",)
-    CATEGORY = ROOT_NAME + "custom_samplers"
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id=f"SamplerEulerAncestralFixedNoise{NODE_SURFIX}",
+            display_name=f"Sampler Euler Ancestral Fixed Noise {SYMBOL}",
+            category=ROOT_NAME + "custom_samplers",
+            inputs=[
+                io.Combo.Input("noise", options=["fixed", "random"], default="fixed"),
+                io.Float.Input("eta", default=1.0, min=0.0, max=100.0, step=0.01, round=False),
+                io.Float.Input("s_noise", default=1.0, min=0.0, max=100.0, step=0.01, round=False),
+            ],
+            outputs=[
+                io.Sampler.Output(),
+            ],
+        )
 
-    FUNCTION = "get_sampler"
-
-    def get_sampler(self, noise, eta, s_noise):
+    @classmethod
+    def execute(cls, noise, eta, s_noise) -> io.NodeOutput:
         sampler = KSAMPLER(sample_euler_ancestral_fixed_noise if noise=="fixed" else sample_euler_ancestral, {"eta": eta, "s_noise": s_noise})
-        return (sampler, )
+        return io.NodeOutput(sampler)

@@ -2,7 +2,8 @@ import comfy
 from latent_preview import get_previewer
 import numpy as np
 import torch
-from ... import ROOT_NAME
+from comfy_api.v0_0_2 import io
+from ... import ROOT_NAME, SYMBOL, NODE_SURFIX
 
 def image_to_tensor(image):
     return torch.tensor(np.array(image).astype(np.float32)) / 255.0
@@ -29,26 +30,30 @@ def prepare_callback(model, steps, x0_output_dict=None, previews=None):
         pbar.update_absolute(step + 1, total_steps, preview_bytes)
     return callback
 
-class SamplerCustomAdvancedPreview:
+class SamplerCustomAdvancedPreview(io.ComfyNode):
 
     @classmethod
-    def INPUT_TYPES(s):
-        return {"required":
-                    {"noise": ("NOISE", ),
-                    "guider": ("GUIDER", ),
-                    "sampler": ("SAMPLER", ),
-                    "sigmas": ("SIGMAS", ),
-                    "latent_image": ("LATENT", ),
-                     }
-                }
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id=f"SamplerCustomAdvancedPreview{NODE_SURFIX}",
+            display_name=f"Sampler Custom Advanced Preview {SYMBOL}",
+            category=ROOT_NAME + "custom_samplers",
+            inputs=[
+                io.Noise.Input("noise"),
+                io.Guider.Input("guider"),
+                io.Sampler.Input("sampler"),
+                io.Sigmas.Input("sigmas"),
+                io.Latent.Input("latent_image"),
+            ],
+            outputs=[
+                io.Latent.Output(display_name="output"),
+                io.Latent.Output(display_name="denoised_output"),
+                io.Image.Output(display_name="previews"),
+            ],
+        )
 
-    RETURN_TYPES = ("LATENT", "LATENT", "IMAGE")
-    RETURN_NAMES = ("output", "denoised_output", "previews")
-
-    FUNCTION = "sample"
-    CATEGORY = ROOT_NAME + "custom_samplers"
-
-    def sample(self, noise, guider, sampler, sigmas, latent_image):
+    @classmethod
+    def execute(cls, noise, guider, sampler, sigmas, latent_image) -> io.NodeOutput:
         latent = latent_image
         latent_image = latent["samples"]
         latent = latent.copy()
@@ -76,4 +81,4 @@ class SamplerCustomAdvancedPreview:
             out_denoised = out
 
         previews = torch.stack(previews)
-        return (out, out_denoised, previews)
+        return io.NodeOutput(out, out_denoised, previews)

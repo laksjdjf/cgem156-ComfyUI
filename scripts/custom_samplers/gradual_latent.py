@@ -3,8 +3,9 @@ import torch
 from torchvision.transforms.functional import gaussian_blur
 from comfy.k_diffusion.sampling import default_noise_sampler, get_ancestral_step, to_d, BrownianTreeNoiseSampler
 from tqdm.auto import trange
+from comfy_api.v0_0_2 import io
 
-from ... import ROOT_NAME
+from ... import ROOT_NAME, SYMBOL, NODE_SURFIX
 
 def interpolate(x, size, unsharp_strength=0.0, unsharp_kernel_size=3, unsharp_sigma=0.5, unsharp=False, mode="bicubic", align_corners=False):
     x = torch.nn.functional.interpolate(x, size=size, mode=mode, align_corners=align_corners)
@@ -61,7 +62,7 @@ def sample_euler_ancestral(
             callback({"x": x, "i": i, "sigma": sigmas[i], "sigma_hat": sigmas[i], "denoised": denoised})
 
         # Euler method
-        d = to_d(x, sigmas[i], denoised) 
+        d = to_d(x, sigmas[i], denoised)
         if i not in upscale_info:
             x = denoised + d * sigma_down
         elif unsharp_target == "x":
@@ -115,7 +116,7 @@ def sample_dpmpp_2s_ancestral(
             callback({"x": x, "i": i, "sigma": sigmas[i], "sigma_hat": sigmas[i], "denoised": denoised})
         if sigma_down == 0:
             # Euler method
-            d = to_d(x, sigmas[i], denoised) 
+            d = to_d(x, sigmas[i], denoised)
             if i not in upscale_info:
                 x = denoised + d * sigma_down
             elif unsharp_target == "x":
@@ -220,7 +221,7 @@ def sample_dpmpp_2m_sde(
             if eta:
                 noise_sampler = BrownianTreeNoiseSampler(x, sigma_min, sigma_max, seed=seed, cpu=True)
                 x = x + noise_sampler(sigmas[i], sigmas[i + 1]) * sigmas[i + 1] * (-2 * eta_h).expm1().neg().sqrt() * s_noise
-                
+
         h_last = h
     return x
 
@@ -270,33 +271,35 @@ def sample_lcm(
     return x
 
 
-class GradualLatentSampler:
+class GradualLatentSampler(io.ComfyNode):
     # kernel_sizeのstepを2にすると、2,4,6,8... となるので、stepを1にしておく
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "sampler_name": (["euler_ancestral", "dpmpp_2s_ancestral", "dpmpp_2m_sde", "lcm"],),
-                "eta": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.01, "round": False}),
-                "s_noise": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 10.0, "step": 0.01, "round": False}),
-                "upscale_ratio": ("FLOAT", {"default": 2.0, "min": 0.0, "max": 16.0, "step": 0.01, "round": False}),
-                "start_step": ("INT", {"default": 5, "min": 0, "max": 1000, "step": 1}),
-                "end_step": ("INT", {"default": 15, "min": 0, "max": 1000, "step": 1}),
-                "upscale_n_step": ("INT", {"default": 3, "min": 0, "max": 1000, "step": 1}),
-                "unsharp_kernel_size": ("INT", {"default": 3, "min": 1, "max": 21, "step": 1}),
-                "unsharp_sigma": ("FLOAT", {"default": 0.5, "min": 0.0, "max": 10.0, "step": 0.01, "round": False}),
-                "unsharp_strength": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 10.0, "step": 0.01, "round": False}),
-                "unsharp_target": (["x", "denoised"],),
-            }
-        }
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id=f"GradualLatentSampler{NODE_SURFIX}",
+            display_name=f"Gradual Latent Sampler {SYMBOL}",
+            category=ROOT_NAME + "custom_samplers",
+            inputs=[
+                io.Combo.Input("sampler_name", options=["euler_ancestral", "dpmpp_2s_ancestral", "dpmpp_2m_sde", "lcm"]),
+                io.Float.Input("eta", default=1.0, min=0.0, max=10.0, step=0.01, round=False),
+                io.Float.Input("s_noise", default=1.0, min=0.0, max=10.0, step=0.01, round=False),
+                io.Float.Input("upscale_ratio", default=2.0, min=0.0, max=16.0, step=0.01, round=False),
+                io.Int.Input("start_step", default=5, min=0, max=1000, step=1),
+                io.Int.Input("end_step", default=15, min=0, max=1000, step=1),
+                io.Int.Input("upscale_n_step", default=3, min=0, max=1000, step=1),
+                io.Int.Input("unsharp_kernel_size", default=3, min=1, max=21, step=1),
+                io.Float.Input("unsharp_sigma", default=0.5, min=0.0, max=10.0, step=0.01, round=False),
+                io.Float.Input("unsharp_strength", default=0.0, min=0.0, max=10.0, step=0.01, round=False),
+                io.Combo.Input("unsharp_target", options=["x", "denoised"]),
+            ],
+            outputs=[
+                io.Sampler.Output(),
+            ],
+        )
 
-    RETURN_TYPES = ("SAMPLER",)
-    CATEGORY = ROOT_NAME + "custom_samplers"
-
-    FUNCTION = "get_sampler"
-
-    def get_sampler(
-        self,
+    @classmethod
+    def execute(
+        cls,
         sampler_name,
         eta,
         s_noise,
@@ -308,7 +311,7 @@ class GradualLatentSampler:
         unsharp_sigma,
         unsharp_strength,
         unsharp_target,
-    ):
+    ) -> io.NodeOutput:
         if sampler_name == "euler_ancestral":
             sample_function = sample_euler_ancestral
         elif sampler_name == "dpmpp_2s_ancestral":
@@ -319,7 +322,7 @@ class GradualLatentSampler:
             sample_function = sample_lcm
         else:
             raise ValueError("Unknown sampler name")
-        
+
         unsharp_target = unsharp_target if unsharp_strength > 0 else "x" # interpの位置が違うので調整
 
         unsharp_kernel_size = unsharp_kernel_size if unsharp_kernel_size % 2 == 1 else unsharp_kernel_size + 1
@@ -339,14 +342,4 @@ class GradualLatentSampler:
                 "unsharp_target": unsharp_target,
             },
         )
-        return (sampler,)
-
-
-NODE_CLASS_MAPPINGS = {
-    "GradualLatentSampler": GradualLatentSampler,
-}
-
-NODE_DISPLAY_NAME_MAPPINGS = {
-    # Sampling
-    "GradualLatentSampler": "GradualLatentSampler",
-}
+        return io.NodeOutput(sampler)
