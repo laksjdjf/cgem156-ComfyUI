@@ -6,10 +6,6 @@ from .flux_map import FLUX_MAP
 
 CATEGORY_NAME = ROOT_NAME + "multiple_lora_loader"
 
-# Generous upper bound for the dynamic (Autogrow) loader below. Autogrow needs a
-# fixed ceiling to pre-register optional slots against; growth just reveals more
-# of them, it doesn't truly create unlimited inputs.
-MAX_DYNAMIC_LORAS = 50
 
 # Module-level cache replacing the old per-instance `self.loaded_lora` dict.
 # execute() is now a classmethod (no `self` to hold state), so the cache is
@@ -106,18 +102,13 @@ def create_class(num_loras):
             node_id=f"MultipleLoraLoader{num_loras}{NODE_SURFIX}",
             display_name=f"MultipleLoraLoader{num_loras} {SYMBOL}",
             category=CATEGORY_NAME,
-            description=(
-                f"Fixed {num_loras}-slot multi-LoRA loader. Superseded by "
-                f"MultipleLoraLoaderDynamic, which grows to any number of slots; "
-                f"kept so existing workflows keep loading."
-            ),
+            description=f"Fixed {num_loras}-slot multi-LoRA loader. Slot counts are configured in config.txt.",
             inputs=inputs,
             outputs=[
                 io.Model.Output(),
                 io.Clip.Output(),
             ],
             hidden=[io.Hidden.unique_id],
-            is_deprecated=True,
         )
 
     @classmethod
@@ -141,90 +132,3 @@ def create_class(num_loras):
         },
     )
 
-
-class MultipleLoraLoaderDynamic(io.ComfyNode):
-    """Truly dynamic multi-LoRA loader built on ComfyUI's V3 Autogrow inputs.
-
-    Design note (Autogrow limitation): Autogrow's per-slot template accepts
-    exactly one Input widget -- its own assertion forbids nesting a
-    DynamicInput (e.g. DynamicSlot, which is what would be needed to bundle a
-    combo + float + bool into a single grow-able "row") as the template. There
-    is no first-party way, as of this API version, to grow one row containing
-    multiple heterogeneous widgets at once. The best available approximation
-    is three parallel Autogrow groups -- lora_names / strength_models / applys
-    -- sharing the same "<field>_<index>" naming the old fixed loaders used.
-    Growing/removing is therefore per-column rather than per-row: a user could
-    in principle grow "lora_name_3" without growing "strength_model_3". To keep
-    that harmless, execute() below treats any missing sibling as its sensible
-    default (lora_name "None" => slot skipped, strength 1.0, apply True)
-    instead of erroring. Users should grow all three columns together to get
-    the expected per-row behavior; this is called out for manual/browser-side
-    verification since it can't be enforced from the schema alone.
-    """
-
-    @classmethod
-    def define_schema(cls) -> io.Schema:
-        lora_options = ["None"] + folder_paths.get_filename_list("loras")
-
-        name_template = io.Autogrow.TemplatePrefix(
-            input=io.Combo.Input("lora_name", options=lora_options),
-            prefix="lora_name_",
-            min=0,
-            max=MAX_DYNAMIC_LORAS,
-        )
-        strength_template = io.Autogrow.TemplatePrefix(
-            input=io.Float.Input("strength_model", default=1.0, min=-20.0, max=20.0, step=0.01, round=0.001),
-            prefix="strength_model_",
-            min=0,
-            max=MAX_DYNAMIC_LORAS,
-        )
-        apply_template = io.Autogrow.TemplatePrefix(
-            input=io.Boolean.Input("apply", default=True),
-            prefix="apply_",
-            min=0,
-            max=MAX_DYNAMIC_LORAS,
-        )
-
-        return io.Schema(
-            node_id=f"MultipleLoraLoaderDynamic{NODE_SURFIX}",
-            display_name=f"MultipleLoraLoaderDynamic {SYMBOL}",
-            category=CATEGORY_NAME,
-            description=(
-                "Dynamically growable multi-LoRA loader (no fixed slot count). "
-                "Grow the lora_names / strength_models / applys inputs together "
-                "(same index suffix, e.g. _0, _1, ...) to add a LoRA slot."
-            ),
-            inputs=[
-                io.Model.Input("model"),
-                io.Boolean.Input("normalize", default=False),
-                io.Float.Input("normalize_sum", default=1.0, min=-50.0, max=50.0, step=0.01, round=0.001),
-                io.Autogrow.Input("lora_names", template=name_template),
-                io.Autogrow.Input("strength_models", template=strength_template),
-                io.Autogrow.Input("applys", template=apply_template),
-                io.Clip.Input("clip_optional", optional=True),
-            ],
-            outputs=[
-                io.Model.Output(),
-                io.Clip.Output(),
-            ],
-            hidden=[io.Hidden.unique_id],
-        )
-
-    @classmethod
-    def execute(cls, model, normalize, normalize_sum, lora_names, strength_models, applys, clip_optional=None) -> io.NodeOutput:
-        clip = clip_optional
-
-        indices = set()
-        for grown in (lora_names, strength_models, applys):
-            for slot_id in grown:
-                indices.add(int(slot_id.rsplit("_", 1)[-1]))
-
-        slots = []
-        for i in sorted(indices):
-            lora_name = lora_names.get(f"lora_name_{i}", "None")
-            strength_model = strength_models.get(f"strength_model_{i}", 1.0)
-            apply = applys.get(f"apply_{i}", True)
-            slots.append((f"dyn_{i}", lora_name, strength_model, apply))
-
-        model, clip = _multiple_lora_loader(cls.hidden.unique_id, model, clip, normalize, normalize_sum, slots)
-        return io.NodeOutput(model, clip)

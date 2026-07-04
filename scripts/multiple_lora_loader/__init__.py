@@ -1,4 +1,4 @@
-from .node import create_class, MultipleLoraLoaderDynamic
+from .node import create_class
 import os
 from ... import SYMBOL, NODE_SURFIX
 
@@ -11,12 +11,9 @@ num_loras = [int(i) for i in config.replace(" ", "").split(",")]
 NODE_CLASS_MAPPINGS = {
     f"MultipleLoraLoader{i}{NODE_SURFIX}": create_class(i) for i in num_loras
 }
-NODE_CLASS_MAPPINGS[f"MultipleLoraLoaderDynamic{NODE_SURFIX}"] = MultipleLoraLoaderDynamic
-
 NODE_DISPLAY_NAME_MAPPINGS = {
     f"MultipleLoraLoader{i}{NODE_SURFIX}": f"MultipleLoraLoader{i} {SYMBOL}" for i in num_loras
 }
-NODE_DISPLAY_NAME_MAPPINGS[f"MultipleLoraLoaderDynamic{NODE_SURFIX}"] = f"MultipleLoraLoaderDynamic {SYMBOL}"
 
 
 
