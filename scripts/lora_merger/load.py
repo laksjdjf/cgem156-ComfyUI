@@ -2,7 +2,8 @@ import comfy
 import folder_paths
 import os
 import re
-from ... import ROOT_NAME
+from comfy_api.v0_0_2 import io
+from ... import ROOT_NAME, NODE_SURFIX, SYMBOL
 
 CATEGORY_NAME = ROOT_NAME + "lora_merger"
 
@@ -63,73 +64,72 @@ LBW12TO20 = [1, 2, 3, 4, 7, 17, 18, 19]
 
 MID_ID = {26:13, 20:10}
 
-class LoraLoaderFromWeight:
-    def __init__(self):
-        self.loaded_lora = None
+class LoraLoaderFromWeight(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id=f"LoraLoaderFromWeight{NODE_SURFIX}",
+            display_name=f"LoRA Loader From Weight {SYMBOL}",
+            category=CATEGORY_NAME,
+            inputs=[
+                io.Custom("LoRA").Input("lora"),
+                io.Model.Input("model"),
+                io.Clip.Input("clip_optional", optional=True),
+            ],
+            outputs=[
+                io.Model.Output(),
+                io.Clip.Output(),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": { 
-                "lora": ("LoRA", ),
-                "model": ("MODEL",),
-            },
-            "optional": {
-                "clip_optional": ("CLIP", ),
-            }
-        }
-    RETURN_TYPES = ("MODEL", "CLIP")
-    FUNCTION = "load_lora_from_weight"
-
-    CATEGORY = CATEGORY_NAME
-
-    def load_lora_from_weight(self, lora, model, clip_optional=None):
+    def execute(cls, lora, model, clip_optional=None) -> io.NodeOutput:
         lora_weight = lora["lora"]
         strength_model = lora["strength_model"]
         strength_clip = lora["strength_clip"]
 
         if strength_model == 0 and strength_clip == 0:
-            return (model, clip_optional)
+            return io.NodeOutput(model, clip_optional)
 
         model_lora, clip_lora = comfy.sd.load_lora_for_models(model, clip_optional, lora_weight, strength_model, strength_clip)
-        return (model_lora, clip_lora)
+        return io.NodeOutput(model_lora, clip_lora)
 
-class LoraLoaderWeightOnly:
-    def __init__(self):
-        self.loaded_lora = None
-        self.lbw = None
+# module-level cache replacing the old per-instance `self.loaded_lora` /
+# `self.lbw` state (execute() is a classmethod, no `self` to cache on).
+_weight_only_cache = {"loaded_lora": None, "lbw": None}
+
+class LoraLoaderWeightOnly(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id=f"LoraLoaderWeightOnly{NODE_SURFIX}",
+            display_name=f"LoRA Loader Weight Only {SYMBOL}",
+            category=CATEGORY_NAME,
+            inputs=[
+                io.Combo.Input("lora_name", options=folder_paths.get_filename_list("loras")),
+                io.Float.Input("strength_model", default=1.0, min=-20.0, max=20.0, step=0.01),
+                io.Float.Input("strength_clip", default=1.0, min=-20.0, max=20.0, step=0.01),
+                io.String.Input("lbw", multiline=False, default=""),
+            ],
+            outputs=[
+                io.Custom("LoRA").Output(),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "lora_name": (folder_paths.get_filename_list("loras"), ),
-                "strength_model": ("FLOAT", {"default": 1.0, "min": -20.0, "max": 20.0, "step": 0.01}),
-                "strength_clip": ("FLOAT", {"default": 1.0, "min": -20.0, "max": 20.0, "step": 0.01}),
-                "lbw": ("STRING", {
-                    "multiline": False,
-                    "default": ""
-                }),
-            }
-        }
-    RETURN_TYPES = ("LoRA", )
-    FUNCTION = "load_lora_weight_only"
-
-    CATEGORY = CATEGORY_NAME
-
-    def load_lora_weight_only(self, lora_name, strength_model, strength_clip, lbw):
+    def execute(cls, lora_name, strength_model, strength_clip, lbw) -> io.NodeOutput:
         lora_path = folder_paths.get_full_path("loras", lora_name)
         lora = None
 
-        if self.loaded_lora is not None:
-            if self.loaded_lora[0] == lora_path:
-                lora = self.loaded_lora[1]
+        if _weight_only_cache["loaded_lora"] is not None:
+            if _weight_only_cache["loaded_lora"][0] == lora_path:
+                lora = _weight_only_cache["loaded_lora"][1]
             else:
-                temp = self.loaded_lora
-                self.loaded_lora = None
+                temp = _weight_only_cache["loaded_lora"]
+                _weight_only_cache["loaded_lora"] = None
                 del temp
 
-        if lora is None or self.lbw != lbw:
+        if lora is None or _weight_only_cache["lbw"] != lbw:
             lora = comfy.utils.load_torch_file(lora_path, safe_load=True)
             if lbw != "":
                 weight_list = parse_weight_list(lbw)
@@ -177,7 +177,7 @@ class LoraLoaderWeightOnly:
                         if alpha_key in lora:
                             del lora[alpha_key]
             
-            self.loaded_lora = (lora_path, lora)
-            self.lbw = lbw
+            _weight_only_cache["loaded_lora"] = (lora_path, lora)
+            _weight_only_cache["lbw"] = lbw
 
-        return ({"lora": lora, "strength_model": strength_model, "strength_clip": strength_clip}, )
+        return io.NodeOutput({"lora": lora, "strength_model": strength_model, "strength_clip": strength_clip})

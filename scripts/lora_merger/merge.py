@@ -1,56 +1,58 @@
 import comfy
 import math
 import torch
-from ... import ROOT_NAME
+from comfy_api.v0_0_2 import io
+from ... import ROOT_NAME, NODE_SURFIX, SYMBOL
 
 CATEGORY_NAME = ROOT_NAME + "lora_merger"
 CLAMP_QUANTILE = 0.99
 REGULAR_LORA = "regular"
 DIFFUSERS_LORA = "diffusers"
 
-class LoraMerge:
-    def __init__(self):
-        self.loaded_lora = None
+class LoraMerge(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id=f"LoraMerger{NODE_SURFIX}",
+            display_name=f"LoRA Merge {SYMBOL}",
+            category=CATEGORY_NAME,
+            inputs=[
+                io.Custom("LoRA").Input("lora_1"),
+                io.Combo.Input("mode", options=["add", "concat", "svd", "svd_fast"]),
+                io.Int.Input(
+                    "rank",
+                    default=16,  # Minimum value
+                    min=1,
+                    max=320,  # Maximum value
+                    step=1,  # Slider's step
+                    display_mode=io.NumberDisplay.number,  # Cosmetic only: display as "number" or "slider"
+                ),
+                io.Float.Input(
+                    "threshold",
+                    default=1.0,
+                    min=0,
+                    max=1,
+                    step=0.01,
+                ),
+                io.Combo.Input("device", options=["cuda", "cpu"]),
+                io.Combo.Input("dtype", options=["float32", "float16", "bfloat16"]),
+                io.Custom("LoRA").Input("lora_2", optional=True),
+            ],
+            outputs=[
+                io.Custom("LoRA").Output(),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "lora_1": ("LoRA",),
-                "mode": (["add", "concat", "svd", "svd_fast"], ),
-                "rank": ("INT", {
-                    "default": 16, 
-                    "min": 1, #Minimum value
-                    "max": 320, #Maximum value
-                    "step": 1, #Slider's step
-                    "display": "number" # Cosmetic only: display as "number" or "slider"
-                }),
-                "threshold": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0,
-                    "max": 1,
-                    "step": 0.01,
-                }),
-                "device": (["cuda", "cpu"], ),
-                "dtype": (["float32", "float16", "bfloat16"], ),
-            },
-            "optional": {
-                "lora_2": ("LoRA",),
-            }
-        }
-    RETURN_TYPES = ("LoRA", )
-    FUNCTION = "lora_merge"
+    def execute(cls, lora_1, lora_2=None, mode=None, rank=None, threshold=None, device=None, dtype=None) -> io.NodeOutput:
 
-    CATEGORY = CATEGORY_NAME
+        lora = cls.merge(lora_1, lora_2, mode, rank, threshold, device, dtype)
 
-    def lora_merge(self, lora_1, lora_2=None, mode=None, rank=None, threshold=None, device=None, dtype=None):
-        
-        lora = self.merge(lora_1, lora_2, mode, rank, threshold, device, dtype)
+        return io.NodeOutput(lora)
 
-        return (lora, )
-    
+    @staticmethod
     @torch.no_grad()
-    def merge(self, lora_1, lora_2, mode, rank, threshold, device, dtype):
+    def merge(lora_1, lora_2, mode, rank, threshold, device, dtype):
         # lora = up @ down * alpha / rank
 
         weight = {}
@@ -123,31 +125,32 @@ class LoraMerge:
         
         return {"lora":weight, "strength_model":1, "strength_clip":1}
     
-class LoraSVDRank:
-    def __init__(self):
-        self.loaded_lora = None
+class LoraSVDRank(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id=f"LoraSVDRank{NODE_SURFIX}",
+            display_name=f"LoRA SVD Rank {SYMBOL}",
+            category=CATEGORY_NAME,
+            inputs=[
+                io.Custom("LoRA").Input("lora"),
+                io.Float.Input(
+                    "threshold",
+                    default=1.0,
+                    min=0,
+                    max=1,
+                    step=0.001,
+                ),
+                io.Combo.Input("device", options=["cuda", "cpu"]),
+            ],
+            outputs=[
+                io.String.Output(),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "lora": ("LoRA",),
-                "threshold": ("FLOAT", {
-                    "default": 1.0,
-                    "min": 0,
-                    "max": 1,
-                    "step": 0.001,
-                }),
-                "device": (["cuda", "cpu"], ),
-            },
-        }
-    RETURN_TYPES = ("STRING", )
-    FUNCTION = "show"
-
-    CATEGORY = CATEGORY_NAME
-    
     @torch.no_grad()
-    def show(self, lora, threshold, device):
+    def execute(cls, lora, threshold, device) -> io.NodeOutput:
 
         keys = lora_module_keys(lora)
         pber = comfy.utils.ProgressBar(len(keys))
@@ -158,8 +161,8 @@ class LoraSVDRank:
             index = svd_show(up, down, threshold, device)
             content += f"{key}: {index}\n"
             pber.update(1)
-        
-        return (content, )
+
+        return io.NodeOutput(content)
     
 @torch.no_grad()
 def calc_up_down_alpha(key, lora, add=True):
