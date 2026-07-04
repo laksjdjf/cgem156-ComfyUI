@@ -1,4 +1,4 @@
-from .node import CLIPTextEncodeBatch, StringInput, BatchString, PrefixString, SaveBatchString, SaveImageBatch, SaveLatentBatch
+from .node import CLIPTextEncodeBatch, StringInput, BatchString, PrefixString, SaveBatchString, SaveImageBatch, SaveLatentBatch, RandomColorPrompt
 from ... import NODE_SURFIX, SYMBOL
 
 NODE_CLASS_MAPPINGS = {
@@ -8,7 +8,8 @@ NODE_CLASS_MAPPINGS = {
     f"PrefixString{NODE_SURFIX}": PrefixString,
     f"SaveBatchString{NODE_SURFIX}": SaveBatchString,
     f"SaveImageBatch{NODE_SURFIX}": SaveImageBatch,
-    f"SaveLatentBatch{NODE_SURFIX}": SaveLatentBatch
+    f"SaveLatentBatch{NODE_SURFIX}": SaveLatentBatch,
+    f"RandomColorPrompt{NODE_SURFIX}": RandomColorPrompt
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -18,7 +19,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     f"PrefixString{NODE_SURFIX}": f"Prefix String {SYMBOL}",
     f"SaveBatchString{NODE_SURFIX}": f"Save Batch String {SYMBOL}",
     f"SaveImageBatch{NODE_SURFIX}": f"Save Image Batch {SYMBOL}",
-    f"SaveLatentBatch{NODE_SURFIX}": f"Save Latent Batch {SYMBOL}"
+    f"SaveLatentBatch{NODE_SURFIX}": f"Save Latent Batch {SYMBOL}",
+    f"RandomColorPrompt{NODE_SURFIX}": f"Random Color Prompt {SYMBOL}"
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]

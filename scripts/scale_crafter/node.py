@@ -3,40 +3,78 @@
 import math
 import comfy.ops
 import torch.nn.functional as F
+from comfy_api.v0_0_2 import io
 ops = comfy.ops.disable_weight_init
 
 from ... import ROOT_NAME
 
 CATEGORY_NAME = ROOT_NAME + "scale-crafter"
 
-class ScaleCrafter:
+class ScaleCrafter(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": {
-                "model": ("MODEL", ),
-                "dilation_rate": ("FLOAT", {"default": 1, "min": 0.01, "max": 10, "step": 0.01 }),
-                "depth": ("INT", {"default": 0, "min": 0, "max": 12, "step": 1, "display": "number"}),
-                "start": ("INT", {"default": 0, "min": 0, "max": 1000, "step": 1, "display": "number"}),
-                "end": ("INT", {"default": 500, "min": 0, "max": 1000, "step": 1, "display": "number"}),
-            },
-        }
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="ScaleCrafter|cgem156",
+            display_name="Scale Crafter 🍌",
+            category=CATEGORY_NAME,
+            inputs=[
+                io.Model.Input("model"),
+                io.Float.Input("dilation_rate", default=1, min=0.01, max=10, step=0.01),
+                io.Int.Input("depth", default=0, min=0, max=12, step=1, display_mode=io.NumberDisplay.number),
+                io.Int.Input("start", default=0, min=0, max=1000, step=1, display_mode=io.NumberDisplay.number),
+                io.Int.Input("end", default=500, min=0, max=1000, step=1, display_mode=io.NumberDisplay.number),
+            ],
+            outputs=[
+                io.Model.Output(),
+            ],
+        )
 
-    RETURN_TYPES = ("MODEL", )
-    FUNCTION = "apply"
-    CATEGORY = CATEGORY_NAME
-
-    def apply(self, model, dilation_rate, depth, start, end):
+    @classmethod
+    def execute(cls, model, dilation_rate, depth, start, end) -> io.NodeOutput:
         new_model = model.clone()
-        self.org_forwards = {}
-        self.start = start
-        self.end = end
-        self.dilation_rate = dilation_rate
-        self.depth = depth
+        org_forwards = {}
 
-        self.target_dilation = (math.ceil(self.dilation_rate), math.ceil(self.dilation_rate))
-        self.target_padding = self.target_dilation
-        self.interp_rate = self.target_dilation[0] / self.dilation_rate
+        target_dilation = (math.ceil(dilation_rate), math.ceil(dilation_rate))
+        target_padding = target_dilation
+        interp_rate = target_dilation[0] / dilation_rate
+
+        def forward_hooker(module, forward):
+            def forward_hook(x):
+                org_size = x.shape[2:]
+                module.dilation = target_dilation
+                module.padding = target_padding
+                if interp_rate != 1.0:
+                    x = F.interpolate(x, scale_factor=interp_rate, mode='bicubic', align_corners=False)
+                x = forward(x)
+                if interp_rate != 1.0:
+                    x = F.interpolate(x, size=org_size, mode='bicubic', align_corners=False)
+                module.dilation = (1, 1)
+                module.padding = (1, 1)
+                return x
+            return forward_hook
+
+        def replace_conv2d(model):
+            for name, module in model.model.diffusion_model.named_modules():
+                if isinstance(module, ops.Conv2d) and module.kernel_size == (3, 3) and module.stride == (1, 1) and module.padding == (1, 1):
+                    if name.split(".")[0] == "input_blocks":
+                        cur_depth = int(name.split(".")[1])
+                        max_depth = cur_depth
+                    elif name.split(".")[0] == "middle_block":
+                        cur_depth = max_depth + 1
+                    elif name.split(".")[0] == "output_blocks":
+                        cur_depth = max_depth - int(name.split(".")[1])
+                    else:
+                        cur_depth = 0
+
+                    if cur_depth >= depth:
+                        org_forwards[name] = module.forward
+                        module.forward = forward_hooker(module, org_forwards[name])
+
+        def restore_conv2d(model):
+            for name, module in model.model.diffusion_model.named_modules():
+                if name in org_forwards:
+                    module.forward = org_forwards[name]
+            org_forwards.clear()
 
         # unet計算前後のパッチ
         def apply_dilate(model_function, kwargs):
@@ -44,51 +82,12 @@ class ScaleCrafter:
             t = new_model.model.model_sampling.timestep(sigmas)
             if t[0] < (1000 - end) or t[0] > (1000 - start):
                 return model_function(kwargs["input"], kwargs["timestep"], **kwargs["c"])
-            
-            self.replace_conv2d(new_model)
+
+            replace_conv2d(new_model)
             retval = model_function(kwargs["input"], kwargs["timestep"], **kwargs["c"])
-            self.restore_conv2d(new_model)
+            restore_conv2d(new_model)
             return retval
 
         new_model.set_model_unet_function_wrapper(apply_dilate)
 
-        return (new_model, )
-    
-    def replace_conv2d(self, model):
-        for name, module in model.model.diffusion_model.named_modules():
-            if isinstance(module, ops.Conv2d) and module.kernel_size == (3, 3) and module.stride == (1, 1) and module.padding == (1, 1):
-                if name.split(".")[0] == "input_blocks":
-                    depth = int(name.split(".")[1])
-                    max_depth = depth
-                elif name.split(".")[0] == "middle_block":
-                    depth = max_depth + 1
-                elif name.split(".")[0] == "output_blocks":
-                    depth = max_depth - int(name.split(".")[1])
-                else:
-                    depth = 0
-
-                if depth >= self.depth:
-                    self.org_forwards[name] = module.forward
-                    module.forward = self.forward_hooker(module, self.org_forwards[name])
-    
-    def restore_conv2d(self, model):
-        for name, module in model.model.diffusion_model.named_modules():
-            if name in self.org_forwards:
-                module.forward = self.org_forwards[name]
-        self.org_forwards = {}
-
-    def forward_hooker(self, module, forward):
-        def forward_hook(x):
-            org_size = x.shape[2:]
-            module.dilation = self.target_dilation
-            module.padding = self.target_padding
-            if self.interp_rate != 1.0:
-                x = F.interpolate(x, scale_factor=self.interp_rate, mode='bicubic', align_corners=False)
-            x = forward(x)
-            if self.interp_rate != 1.0:
-                x = F.interpolate(x, size=org_size, mode='bicubic', align_corners=False)
-            module.dilation = (1, 1)
-            module.padding = (1, 1)
-            return x
-        return forward_hook
-
+        return io.NodeOutput(new_model)

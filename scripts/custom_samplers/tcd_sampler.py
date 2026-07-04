@@ -2,8 +2,9 @@ from comfy.samplers import KSAMPLER
 import torch
 from comfy.k_diffusion.sampling import default_noise_sampler, to_d
 from tqdm.auto import trange
+from comfy_api.v0_0_2 import io
 
-from ... import ROOT_NAME
+from ... import ROOT_NAME, SYMBOL, NODE_SURFIX
 
 @torch.no_grad()
 def sampler_tcd(model, x, sigmas, extra_args=None, callback=None, disable=None, noise_sampler=None, gamma=None):
@@ -37,23 +38,22 @@ def sampler_tcd(model, x, sigmas, extra_args=None, callback=None, disable=None, 
             x = x + noise_sampler(sigma_from, sigma_to) * sigma_up
     return x
 
-class TCDSampler:
+class TCDSampler(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required":{
-                "gamma": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 1.0, "step":0.01}),
-            },
-        }
-    RETURN_TYPES = ("SAMPLER",)
-    CATEGORY = ROOT_NAME + "custom_samplers"
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id=f"TCDSampler{NODE_SURFIX}",
+            display_name=f"TCD Sampler {SYMBOL}",
+            category=ROOT_NAME + "custom_samplers",
+            inputs=[
+                io.Float.Input("gamma", default=0.3, min=0.0, max=1.0, step=0.01),
+            ],
+            outputs=[
+                io.Sampler.Output(),
+            ],
+        )
 
-    FUNCTION = "get_sampler"
-
-    def get_sampler(self, gamma):
+    @classmethod
+    def execute(cls, gamma) -> io.NodeOutput:
         sampler = KSAMPLER(sampler_tcd, {"gamma": gamma})
-        return (sampler, )
-    
-NODE_CLASS_MAPPINGS = {
-    "TCDSampler": TCDSampler,
-}
+        return io.NodeOutput(sampler)
