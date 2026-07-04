@@ -5,10 +5,16 @@ import cv2
 import pandas as pd
 import torch
 import matplotlib.pyplot as plt
+from comfy_api.v0_0_2 import io
 
-from ... import ROOT_NAME
+from ... import ROOT_NAME, SYMBOL, NODE_SURFIX
 
 CATEGORY_NAME = ROOT_NAME + "wd-tagger"
+
+WDTagger = io.Custom("WD_TAGGER")
+WDTaggerLabels = io.Custom("WD_TAGGER_LABELS")
+WDTaggerFeatures = io.Custom("WD-TAGGER-FEATURES")
+BatchString = io.Custom("BATCH_STRING")
 
 MODEL_REPO_MAP = [
     "SmilingWolf/wd-vit-tagger-v3",
@@ -18,57 +24,68 @@ MODEL_REPO_MAP = [
     "SmilingWolf/wd-eva02-large-tagger-v3",
 ]
 
-class LoadTagger:
-    def __init__(self):
-        self.loaded_model = None
-        self.loaded_df = None
-        self.loaded_model_name = None
+# module-level cache (V3 nodes execute as classmethods, so instance attributes are not available)
+_TAGGER_CACHE = {
+    "loaded_model": None,
+    "loaded_df": None,
+    "loaded_model_name": None,
+}
+
+class LoadTagger(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id=f"LoadTagger{NODE_SURFIX}",
+            display_name=f"Load Tagger {SYMBOL}",
+            category=CATEGORY_NAME,
+            inputs=[
+                io.Combo.Input("tagger", options=MODEL_REPO_MAP),
+                io.Combo.Input("dtype", options=["fp16", "fp32", "bf16"]),
+            ],
+            outputs=[
+                WDTagger.Output(),
+                WDTaggerLabels.Output(),
+            ],
+        )
 
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": { 
-                "tagger": (MODEL_REPO_MAP,),
-                "dtype": (["fp16", "fp32", "bf16"], ),
-            }
-        }
-    RETURN_TYPES = ("WD_TAGGER", "WD_TAGGER_LABELS")
-    FUNCTION = "load_tagger"
-
-    CATEGORY = CATEGORY_NAME
-
     @torch.inference_mode(False)
-    def load_tagger(self, tagger, dtype):
-        
-        if self.loaded_model_name != tagger:
-            self.loaded_model_name = tagger
-            self.loaded_model = timm.create_model(f"hf_hub:{tagger}", pretrained=True)
-            self.loaded_df = pd.read_csv(f"https://huggingface.co/{tagger}/resolve/main/selected_tags.csv")
-        self.dtype = torch.float16 if dtype == "fp16" else torch.float32 if dtype == "fp32" else torch.bfloat16
-        self.loaded_model = self.loaded_model.to("cuda", dtype=self.dtype).eval()
+    def execute(cls, tagger, dtype) -> io.NodeOutput:
 
-        return (self.loaded_model, self.loaded_df)
-    
-class PredictTag:
+        if _TAGGER_CACHE["loaded_model_name"] != tagger:
+            _TAGGER_CACHE["loaded_model_name"] = tagger
+            _TAGGER_CACHE["loaded_model"] = timm.create_model(f"hf_hub:{tagger}", pretrained=True)
+            _TAGGER_CACHE["loaded_df"] = pd.read_csv(f"https://huggingface.co/{tagger}/resolve/main/selected_tags.csv")
+        torch_dtype = torch.float16 if dtype == "fp16" else torch.float32 if dtype == "fp32" else torch.bfloat16
+        _TAGGER_CACHE["loaded_model"] = _TAGGER_CACHE["loaded_model"].to("cuda", dtype=torch_dtype).eval()
+
+        return io.NodeOutput(_TAGGER_CACHE["loaded_model"], _TAGGER_CACHE["loaded_df"])
+
+class PredictTag(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": { 
-                "tagger": ("WD_TAGGER",),
-                "labels": ("WD_TAGGER_LABELS",),
-                "image": ("IMAGE",),
-                "rating": ("BOOLEAN", {"default": False}),
-                "character_thereshold": ("FLOAT", {"default": 0.85, "min": 0.0, "max": 1.001, "step": 0.001}),
-                "general_thereshold": ("FLOAT", {"default": 0.35, "min": 0.0, "max": 1.001, "step": 0.001}),
-            }
-        }
-    
-    RETURN_TYPES = ("BATCH_STRING", "STRING", "WD-TAGGER-FEATURES")
-    FUNCTION = "predict_tag"
-    CATEGORY = CATEGORY_NAME
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id=f"PredictTag{NODE_SURFIX}",
+            display_name=f"Predict Tag {SYMBOL}",
+            category=CATEGORY_NAME,
+            inputs=[
+                WDTagger.Input("tagger"),
+                WDTaggerLabels.Input("labels"),
+                io.Image.Input("image"),
+                io.Boolean.Input("rating", default=False),
+                io.Float.Input("character_thereshold", default=0.85, min=0.0, max=1.001, step=0.001),
+                io.Float.Input("general_thereshold", default=0.35, min=0.0, max=1.001, step=0.001),
+            ],
+            outputs=[
+                BatchString.Output(),
+                io.String.Output(),
+                WDTaggerFeatures.Output(),
+            ],
+        )
 
+    @classmethod
     @torch.inference_mode(False)
-    def predict_tag(self, tagger, labels, image, rating, character_thereshold, general_thereshold):
+    def execute(cls, tagger, labels, image, rating, character_thereshold, general_thereshold) -> io.NodeOutput:
         dtype = tagger.parameters().__next__().dtype
         preprocessed_image = preprocess(image).to("cuda", dtype=dtype)
         with torch.no_grad():
@@ -86,7 +103,7 @@ class PredictTag:
                 tags.append(sorted_labels[sorted_labels["category"] == 9]["name"].to_list()[0])
             character_tags = sorted_labels[(sorted_labels["prob"] > character_thereshold) & (sorted_labels["category"] == 4)]["name"].to_list()
             general_tags = sorted_labels[(sorted_labels["prob"] > general_thereshold) & (sorted_labels["category"] == 0)]["name"].to_list()
-            
+
             tags += character_tags + general_tags
             prompt = ", ".join([tag.replace("_", " ") for tag in tags])
             prompts.append(prompt)
@@ -94,44 +111,47 @@ class PredictTag:
         string = "\n".join([f"prompt:{i}\n{prompt}" for i, prompt in enumerate(prompts)])
         id_to_tag = labels['name'].to_dict()
         tag_to_id = {v:k for k,v in id_to_tag.items()}
-        
+
         features = {
             "feature": feature,
             "image": ((preprocessed_image + 1) / 2).flip(1).permute(0, 2, 3, 1).float().cpu(),  # なにこれは・・・
             "tag_to_id": tag_to_id,
             "prob": probs
         }
-        
-        return (prompts, string, features)
-    
-class GradCam:
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": { 
-                "tagger": ("WD_TAGGER",),
-                "features": ("WD-TAGGER-FEATURES",),
-                "target_tag": ("STRING",{"default": "", "multiline": True}),
-                "heat_map_alpha": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "intepolate": (["nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"], {"default": "bilinear"}),
-                "negative": ("BOOLEAN", ),
-            }
-        }
-    
-    RETURN_TYPES = ("IMAGE", )
-    FUNCTION = "grad_cam"
-    CATEGORY = CATEGORY_NAME
 
+        return io.NodeOutput(prompts, string, features)
+
+class GradCam(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id=f"GradCam{NODE_SURFIX}",
+            display_name=f"Grad Cam {SYMBOL}",
+            category=CATEGORY_NAME,
+            inputs=[
+                WDTagger.Input("tagger"),
+                WDTaggerFeatures.Input("features"),
+                io.String.Input("target_tag", default="", multiline=True),
+                io.Float.Input("heat_map_alpha", default=0.3, min=0.0, max=1.0, step=0.01),
+                io.Combo.Input("intepolate", options=["nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"], default="bilinear"),
+                io.Boolean.Input("negative"),
+            ],
+            outputs=[
+                io.Image.Output(),
+            ],
+        )
+
+    @classmethod
     @torch.inference_mode(False)
-    def grad_cam(self, tagger, features, target_tag, heat_map_alpha, intepolate, negative):
-        
+    def execute(cls, tagger, features, target_tag, heat_map_alpha, intepolate, negative) -> io.NodeOutput:
+
         image = features["image"]
-        
+
         size = (image.shape[1], image.shape[2])
         target_ids = [features["tag_to_id"][tag.strip().replace(" ", "_")] for tag in target_tag.strip().strip(",").split(",")]
 
         features = features["feature"].detach().clone().requires_grad_(True)
-        
+
         gradients = []
         if features.shape[1] == 1025: # eva02-large
             feature_size = 32
@@ -158,7 +178,7 @@ class GradCam:
         for i in range(len(features)):
             feature = features[i].unsqueeze(0)
             outputs = tagger.forward_head(feature).sigmoid()
-            
+
             output = outputs[0, torch.tensor(target_ids)].sum(dim=-1)
 
             gradients.append(torch.autograd.grad(output, feature, retain_graph=True)[0])
@@ -183,36 +203,39 @@ class GradCam:
         heat_map = torch.nn.functional.interpolate(heat_map, size=size, mode=intepolate)
         heat_map = heat_map.permute(0, 2, 3, 1)
 
-        return (image * (1 - heat_map_alpha) + heat_map * heat_map_alpha, )
+        return io.NodeOutput(image * (1 - heat_map_alpha) + heat_map * heat_map_alpha)
 
-class GradCamAuto:
+class GradCamAuto(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": { 
-                "tagger": ("WD_TAGGER",),
-                "features": ("WD-TAGGER-FEATURES",),
-                "threshold": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "heat_map_alpha": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "intepolate": (["nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"], {"default": "bilinear"}),
-            }
-        }
-    
-    RETURN_TYPES = ("IMAGE", )
-    FUNCTION = "grad_cam"
-    CATEGORY = CATEGORY_NAME
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id=f"GradCamAuto{NODE_SURFIX}",
+            display_name=f"Grad Cam Auto {SYMBOL}",
+            category=CATEGORY_NAME,
+            inputs=[
+                WDTagger.Input("tagger"),
+                WDTaggerFeatures.Input("features"),
+                io.Float.Input("threshold", default=0.3, min=0.0, max=1.0, step=0.01),
+                io.Float.Input("heat_map_alpha", default=0.3, min=0.0, max=1.0, step=0.01),
+                io.Combo.Input("intepolate", options=["nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"], default="bilinear"),
+            ],
+            outputs=[
+                io.Image.Output(),
+            ],
+        )
 
+    @classmethod
     @torch.inference_mode(False)
-    def grad_cam(self, tagger, features, threshold, heat_map_alpha, intepolate):
-        
+    def execute(cls, tagger, features, threshold, heat_map_alpha, intepolate) -> io.NodeOutput:
+
         image = features["image"].detach().clone()
         if image.shape[0] > 1:
             raise ValueError("Batch size must be 1")
-        
+
         size = (image.shape[1], image.shape[2])
         id_to_tag = {v:k for k,v in features["tag_to_id"].items()}
         features = features["feature"].detach().clone().requires_grad_(True)
-        
+
         gradients = []
         if features.shape[1] == 1025: # eva02-large
             feature_size = 32
@@ -245,7 +268,7 @@ class GradCamAuto:
             gradients.append(torch.autograd.grad(output, features, retain_graph=True)[0])
         tagger.zero_grad()
         features.grad = None
-        
+
         gradients = torch.cat(gradients)
 
         weight = torch.mean(gradients, dim=hw_dim, keepdim=True)
@@ -271,7 +294,7 @@ class GradCamAuto:
             score = outputs[0, target_id]
             cv2.putText(image, f"{target_tag}:", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
             cv2.putText(image, f"{score:.2f}", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        
+
         # sort by score
         image_score = [(image, output.item()) for image, output in zip(images, outputs_filtered)]
         image_score.sort(key=lambda x: x[1], reverse=True)
@@ -279,28 +302,32 @@ class GradCamAuto:
 
         output_image = torch.from_numpy(np.array(images))
         output_image = output_image.float() / 255
-        return (output_image, )
+        return io.NodeOutput(output_image)
 
-class GradPair:
+class GradPair(io.ComfyNode):
     @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": { 
-                "tagger": ("WD_TAGGER",),
-                "features": ("WD-TAGGER-FEATURES",),
-                "heat_map_alpha": ("FLOAT", {"default": 0.3, "min": 0.0, "max": 1.0, "step": 0.01}),
-                "intepolate": (["nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"], {"default": "bilinear"}),
-                "negative": ("BOOLEAN", ),
-            }
-        }
-    
-    RETURN_TYPES = ("IMAGE", "STRING")
-    FUNCTION = "grad_cam"
-    CATEGORY = CATEGORY_NAME
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id=f"GradPair{NODE_SURFIX}",
+            display_name=f"Grad Pair {SYMBOL}",
+            category=CATEGORY_NAME,
+            inputs=[
+                WDTagger.Input("tagger"),
+                WDTaggerFeatures.Input("features"),
+                io.Float.Input("heat_map_alpha", default=0.3, min=0.0, max=1.0, step=0.01),
+                io.Combo.Input("intepolate", options=["nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"], default="bilinear"),
+                io.Boolean.Input("negative"),
+            ],
+            outputs=[
+                io.Image.Output(),
+                io.String.Output(),
+            ],
+        )
 
+    @classmethod
     @torch.inference_mode(False)
-    def grad_cam(self, tagger, features, heat_map_alpha, intepolate, negative):
-    
+    def execute(cls, tagger, features, heat_map_alpha, intepolate, negative) -> io.NodeOutput:
+
         prob_diff = (features["prob"][0] - features["prob"][1])
         prob_diff_data = pd.DataFrame({"label": features["tag_to_id"].keys(), "prob_diff": prob_diff})
         prob_diff_data = prob_diff_data.sort_values(by="prob_diff", ascending=False)
@@ -309,15 +336,15 @@ class GradPair:
         bottom_20 = prob_diff_data.tail(20).sort_values(by="prob_diff")
 
         output_string = f"Top 20 difference:\n{top_20.to_string(index=False)}\n ... \n:\n{bottom_20.to_string(index=False)}"
-        
+
         image = features["image"]
         if image.shape[0] != 2:
             raise ValueError("Batch size must be 2")
-        
+
         size = (image.shape[1], image.shape[2])
 
         features = features["feature"].detach().clone().requires_grad_(True)
-        
+
         gradients = []
         if features.shape[1] == 1025: # eva02-large
             feature_size = 32
@@ -371,31 +398,34 @@ class GradPair:
         heat_map = torch.nn.functional.interpolate(heat_map, size=size, mode=intepolate)
         heat_map = heat_map.permute(0, 2, 3, 1)
 
-        return (image * (1 - heat_map_alpha) + heat_map * heat_map_alpha, output_string)
-    
-class WDTaggerSimilarity:
-    @classmethod
-    def INPUT_TYPES(s):
-        return {
-            "required": { 
-                "tagger": ("WD_TAGGER",),
-                "labels": ("WD_TAGGER_LABELS",),
-                "tag": ("STRING", {"multiline": True}),
-                "category": (["all", "general", "character"], ),
-                "ascending": ("BOOLEAN", {"default": False}),
-            }
-        }
-    
-    RETURN_TYPES = ("STRING",)
-    FUNCTION = "similarity"
-    CATEGORY = CATEGORY_NAME
+        return io.NodeOutput(image * (1 - heat_map_alpha) + heat_map * heat_map_alpha, output_string)
 
-    def similarity(self, tagger, labels, tag, category, ascending):
+class WDTaggerSimilarity(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id=f"WDTaggerSimilarity{NODE_SURFIX}",
+            display_name=f"WD Tagger Similarity {SYMBOL}",
+            category=CATEGORY_NAME,
+            inputs=[
+                WDTagger.Input("tagger"),
+                WDTaggerLabels.Input("labels"),
+                io.String.Input("tag", multiline=True),
+                io.Combo.Input("category", options=["all", "general", "character"]),
+                io.Boolean.Input("ascending", default=False),
+            ],
+            outputs=[
+                io.String.Output(),
+            ],
+        )
+
+    @classmethod
+    def execute(cls, tagger, labels, tag, category, ascending) -> io.NodeOutput:
         dtype = tagger.parameters().__next__().dtype
         tag_list = [t.strip().replace(" ", "_") for t in tag.strip().strip(",").split(",")]
         tag_ids = [labels[labels["name"] == t].index[0] for t in tag_list if t in labels["name"].values]
         if len(tag_ids) == 0:
-            return (f"No valid tags found in input: {tag}", )
+            return io.NodeOutput(f"No valid tags found in input: {tag}")
 
         with torch.no_grad():
             tag_embeddings = tagger.get_classifier().weight[tag_ids].to("cpu", dtype=dtype)
@@ -415,5 +445,5 @@ class WDTaggerSimilarity:
         labels = labels.sort_values(by="similarity", ascending=ascending)
         output_string = f"Similarity result for tags: {', '.join(tag_list)}\n"
         output_string += labels[["name", "similarity"]].head(50).to_string(index=False)
-        
-        return (output_string, )
+
+        return io.NodeOutput(output_string)
