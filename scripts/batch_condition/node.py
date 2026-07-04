@@ -74,22 +74,40 @@ class StringInput(io.ComfyNode):
     def execute(cls, text) -> io.NodeOutput:
         return io.NodeOutput(text)
 
-class BatchString:
-    # NOTE: kept in V1 form. js/batch_condition.js dynamically adds/removes
-    # "text{n}" widget-inputs client-side beyond what INPUT_TYPES declares,
-    # and encode() consumes them via an unbounded **kwargs pattern. There is
-    # no fixed schema to express in io.Schema for this node, so it cannot be
-    # migrated to V3 without changing the dynamic-input behavior.
+class BatchString(io.ComfyNode):
+    # NOTE on workflow compatibility: the old V1 node relied on
+    # js/batch_condition.js to add "text{n}" STRING widget-inputs
+    # client-side beyond what INPUT_TYPES declared, consumed via an
+    # unbounded **kwargs pattern (encode() rebuilt the list from
+    # kwargs["text1"], kwargs["text2"], ...). This migrates to the official
+    # V3 Autogrow dynamic-input API with explicit names "text1".."textN" so
+    # the resolved kwarg names match the old JS-generated names exactly.
+    # Old workflows that used up to MAX_TEXTS inputs should therefore
+    # reconnect by name.
+    MAX_TEXTS = 50
+
     @classmethod
-    def INPUT_TYPES(s):
-        return {"required": {}}
-    RETURN_TYPES = ("BATCH_STRING",)
-    FUNCTION = "encode"
+    def define_schema(cls) -> io.Schema:
+        template = io.Autogrow.TemplateNames(
+            input=io.String.Input("text", multiline=True),
+            names=[f"text{i}" for i in range(1, cls.MAX_TEXTS + 1)],
+            min=0,
+        )
+        return io.Schema(
+            node_id=f"BatchString{NODE_SURFIX}",
+            display_name=f"Batch String {SYMBOL}",
+            category=CATEGORY_NAME,
+            inputs=[
+                io.Autogrow.Input("texts", template=template),
+            ],
+            outputs=[
+                io.Custom("BATCH_STRING").Output(),
+            ],
+        )
 
-    CATEGORY = CATEGORY_NAME
-
-    def encode(self, **kwargs):
-        return ([kwargs[f"text{i+1}"] for i in range(len(kwargs))], )
+    @classmethod
+    def execute(cls, texts: io.Autogrow.Type) -> io.NodeOutput:
+        return io.NodeOutput(list(texts.values()))
 
 class PrefixString(io.ComfyNode):
     @classmethod
