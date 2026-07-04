@@ -59,7 +59,6 @@ class ReferenceApply(io.ComfyNode):
 
             sigma = extra_options["sigmas"][0].item()
 
-
             if end_sigma <= sigma <= start_sigma and block_number <= depth:
                 k_ref = k_out[index::batch_size].repeat_interleave(batch_size, dim=0).clone()
                 v_ref = v_out[index::batch_size].repeat_interleave(batch_size, dim=0).clone()
